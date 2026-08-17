@@ -29,3 +29,25 @@ small application should make later milestones easier to understand.
 No chess board, chess rules library, engine integration, backend, persistence,
 or styling framework was introduced. Milestone 1 remains intentionally
 unstarted.
+
+---
+
+# 2026-08-17 — Milestone 1: Board and FEN
+
+Chess Workbench can now load and validate full FEN positions and accept legal
+drag-and-drop moves on a responsive board. The displayed FEN updates after each
+move, while invalid FEN and illegal moves leave the last valid position intact.
+
+The key design decision is that a normalized FEN string is the single source of
+truth. React owns that immutable value; `chess.js` objects exist only briefly
+inside the ordinary TypeScript domain module. This keeps chess rules out of the
+components and prevents the board widget from becoming a competing state store.
+
+Promotion is a deliberate two-step action. A pawn remains on its original square
+until the user chooses Queen, Rook, Bishop, or Knight, so underpromotion is fully
+supported for both colours and cancellation is safe.
+
+The test suite now covers FEN validation, normal and illegal moves, castling, en
+passant, promotion and underpromotion, plus the user-visible flow between the FEN
+form, board, error message, and promotion chooser. Stockfish and all later
+analysis features remain outside this milestone.

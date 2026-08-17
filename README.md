@@ -1,8 +1,8 @@
 # Chess Workbench
 
-Chess Workbench is a personal chess-learning application. Milestone 0 contains
-only the development skeleton; chess analysis features will be added in later
-milestones.
+Chess Workbench is a personal chess-learning application. It currently provides
+an interactive board for loading FEN positions and making legal moves; chess
+analysis features will be added in later milestones.
 
 ## Prerequisites
 
@@ -51,3 +51,7 @@ the recorded Node version when nvm is available:
 Vite serves `index.html`, which loads `src/main.tsx`. That module mounts the
 root React component from `src/App.tsx` and loads the global stylesheet from
 `src/index.css`.
+
+The normalized FEN held by `App` is the current position. Chess rules and direct
+`chess.js` use are contained in `src/chess/position.ts`, while
+`src/components/PositionBoard.tsx` adapts the visual board to application events.
