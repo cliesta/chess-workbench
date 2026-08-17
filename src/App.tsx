@@ -5,6 +5,7 @@ import {
   parsePosition,
   type PromotionPiece,
 } from "./chess/position";
+import { AnalysisPanel } from "./components/AnalysisPanel";
 import { PositionBoard } from "./components/PositionBoard";
 import { PromotionDialog } from "./components/PromotionDialog";
 
@@ -92,29 +93,36 @@ function App() {
           onMove={handleMove}
         />
 
-        <section className="position-controls" aria-labelledby="position-title">
-          <h2 id="position-title">Position</h2>
-          <form onSubmit={handleFenSubmit}>
-            <label htmlFor="fen-input">FEN</label>
-            <input
-              id="fen-input"
-              type="text"
-              value={fenDraft}
-              onChange={(event) => setFenDraft(event.target.value)}
-              aria-invalid={fenError !== null}
-              aria-describedby={fenError ? "fen-error" : undefined}
-              autoCapitalize="none"
-              autoComplete="off"
-              spellCheck={false}
-            />
-            {fenError && (
-              <p id="fen-error" className="error-message" role="alert">
-                {fenError}
-              </p>
-            )}
-            <button type="submit">Load position</button>
-          </form>
-        </section>
+        <div className="side-panel">
+          <section
+            className="position-controls"
+            aria-labelledby="position-title"
+          >
+            <h2 id="position-title">Position</h2>
+            <form onSubmit={handleFenSubmit}>
+              <label htmlFor="fen-input">FEN</label>
+              <input
+                id="fen-input"
+                type="text"
+                value={fenDraft}
+                onChange={(event) => setFenDraft(event.target.value)}
+                aria-invalid={fenError !== null}
+                aria-describedby={fenError ? "fen-error" : undefined}
+                autoCapitalize="none"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {fenError && (
+                <p id="fen-error" className="error-message" role="alert">
+                  {fenError}
+                </p>
+              )}
+              <button type="submit">Load position</button>
+            </form>
+          </section>
+
+          <AnalysisPanel fen={positionFen} />
+        </div>
       </div>
 
       {pendingPromotion && (

@@ -371,11 +371,11 @@ redundant because showing a correct score beside the wrong position would be a
 serious product error.
 
 If `stop` does not produce `bestmove` within a short watchdog period (about one
-second beyond the normal search limit), the client terminates the stuck Worker,
-creates and initializes a fresh one, and starts only the latest pending request.
-This costs another engine download/initialization in a rare failure case, but it
-restores a known protocol boundary instead of guessing which search later lines
-belong to.
+second beyond the normal search limit), the client terminates the stuck Worker
+and reports an engine error. It does not automatically create a replacement.
+Reloading the page is an acceptable recovery for Milestone 2. This preserves a
+known protocol boundary without adding retry state and another initialization
+lifecycle before there is evidence that recovery is needed in practice.
 
 React effect cleanup stops the effect's request. Component unmount disposes the
 client and invalidates the current ID before teardown, so late promise
@@ -506,7 +506,7 @@ input, and legal-move behaviour continue working exactly as in Milestone 1.
   not shown to users.
 - **Interrupted analysis:** an expected position change clears the old result
   and produces no error banner. Manual disposal resolves work as interrupted.
-  A stop timeout triggers the Worker restart described above.
+  A stop timeout terminates the Worker and reports an engine error.
 - **Runtime Worker failure during search:** reject the active request, discard
   pending analysis, terminate the Worker, and show error. Automatic retries are
   not added; reloading the page is an acceptable recovery for Milestone 2.
@@ -586,9 +586,8 @@ Inject a minimal Worker-shaped test double into `StockfishAnalysisClient`:
   and cannot update B.
 - Prove B's `position`/`go` are not sent until A emits `bestmove`.
 - Request B and then C while A stops; prove B is superseded and only C starts.
-- Simulate a missing `bestmove` after `stop`; with fake timers, prove the old
-  Worker is terminated and only the latest request starts on a new initialized
-  Worker.
+- Simulate a missing `bestmove` after `stop`; with fake timers, prove the Worker
+  is terminated, pending work does not start, and the client reports an error.
 - Dispose during initialization and during search; prove timers and Worker are
   cleaned up and no later update is emitted.
 - Simulate Worker and startup errors and verify typed failures.
@@ -675,8 +674,8 @@ Milestone 2 is complete when all of the following are true:
 - Changing position clears the old display immediately, stops or supersedes the
   old request, and no delayed output from an earlier position is ever rendered
   for the current one.
-- Searches are serialized across the UCI `bestmove` boundary, with a bounded
-  Worker-restart fallback if stopping stalls.
+- Searches are serialized across the UCI `bestmove` boundary; a bounded stop
+  timeout terminates the Worker and becomes a contained engine error.
 - React components do not send, receive, or parse UCI strings, and
   `src/chess/position.ts` remains the application's direct `chess.js` boundary.
 - Worker load, Wasm initialization, protocol, and runtime failures are contained

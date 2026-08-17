@@ -55,7 +55,13 @@ p {
   max-width: 42rem;
 }
 
-.position-controls {
+.side-panel {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.position-controls,
+.analysis-panel {
   padding: 1.25rem;
   border: 1px solid #d8d3c8;
   border-radius: 0.5rem;
@@ -63,8 +69,44 @@ p {
 }
 
 .position-controls h2,
+.analysis-panel h2,
 .promotion-dialog h2 {
   margin: 0 0 1rem;
+}
+
+.analysis-results {
+  display: grid;
+  gap: 0.8rem;
+  margin: 0;
+}
+
+.analysis-results div {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+.analysis-results dt {
+  font-weight: 700;
+}
+
+.analysis-results dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.analysis-convention,
+.analysis-note {
+  color: #52606d;
+  font-size: 0.9rem;
+}
+
+.analysis-license {
+  display: inline-block;
+  margin-top: 0.5rem;
+  color: #315c8a;
+  font-size: 0.9rem;
 }
 
 form {

@@ -1,5 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { STARTING_FEN, attemptMove, parsePosition } from "./position";
+import {
+  STARTING_FEN,
+  attemptMove,
+  formatPrincipalVariation,
+  parsePosition,
+} from "./position";
 
 describe("parsePosition", () => {
   test("accepts and normalizes a valid position", () => {
@@ -93,6 +98,55 @@ describe("attemptMove", () => {
     expect(attemptMove(fen, "a2", "a1", "r")).toEqual({
       kind: "moved",
       fen: "4k3/8/8/8/8/8/8/r3K3 w - - 0 2",
+    });
+  });
+});
+
+describe("formatPrincipalVariation", () => {
+  test("replays a line from a non-starting position", () => {
+    expect(
+      formatPrincipalVariation(
+        "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+        ["g1f3", "b8c6", "f1b5"],
+      ),
+    ).toEqual({
+      notation: "2. Nf3 Nc6 3. Bb5",
+      complete: true,
+      usesRawNotation: false,
+    });
+  });
+
+  test("numbers a line that starts with Black to move", () => {
+    expect(
+      formatPrincipalVariation(
+        "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+        ["e7e5", "g1f3"],
+      ).notation,
+    ).toBe("1... e5 2. Nf3");
+  });
+
+  test.each([
+    ["r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", ["e1g1"], "1. O-O"],
+    ["4k3/P7/8/8/8/8/8/4K3 w - - 0 1", ["a7a8q"], "1. a8=Q+"],
+  ] as const)("uses chess.js SAN for special moves", (fen, moves, notation) => {
+    expect(formatPrincipalVariation(fen, [...moves]).notation).toBe(notation);
+  });
+
+  test("preserves a valid SAN prefix when later output is malformed", () => {
+    expect(
+      formatPrincipalVariation(STARTING_FEN, ["e2e4", "truncated"]),
+    ).toEqual({
+      notation: "1. e4",
+      complete: false,
+      usesRawNotation: false,
+    });
+  });
+
+  test("returns a marked raw fallback when the first move cannot be converted", () => {
+    expect(formatPrincipalVariation(STARTING_FEN, ["e2e5", "e7e5"])).toEqual({
+      notation: "e2e5 e7e5",
+      complete: false,
+      usesRawNotation: true,
     });
   });
 });

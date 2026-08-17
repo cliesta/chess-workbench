@@ -29,6 +29,14 @@ vi.mock("./components/PositionBoard", () => ({
   ),
 }));
 
+vi.mock("./components/AnalysisPanel", () => ({
+  AnalysisPanel: ({ fen }: { fen: string }) => (
+    <section aria-label="Analysis">
+      <span data-testid="analysis-position">{fen}</span>
+    </section>
+  ),
+}));
+
 test("shows the starting position in the board and FEN input", () => {
   render(<App />);
 
@@ -49,6 +57,7 @@ test("loads a valid FEN into the board and input", () => {
   fireEvent.click(screen.getByRole("button", { name: "Load position" }));
 
   expect(screen.getByTestId("board-position")).toHaveTextContent(fen);
+  expect(screen.getByTestId("analysis-position")).toHaveTextContent(fen);
   expect(screen.getByLabelText("FEN")).toHaveValue(fen);
 });
 
@@ -63,6 +72,9 @@ test("shows an accessible error and keeps the board for invalid FEN", () => {
   expect(screen.getByRole("alert")).toHaveTextContent(/invalid fen/i);
   expect(screen.getByLabelText("FEN")).toHaveValue("not a fen");
   expect(screen.getByTestId("board-position")).toHaveTextContent(STARTING_FEN);
+  expect(screen.getByTestId("analysis-position")).toHaveTextContent(
+    STARTING_FEN,
+  );
 });
 
 test("clears a FEN error after loading a corrected position", () => {
