@@ -15,7 +15,8 @@
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "format": "prettier . --write",
-    "format:check": "prettier . --check"
+    "format:check": "prettier . --check",
+    "verify": "npm run format:check && npm run lint && npm test && npm run typecheck && npm run build"
   },
   "dependencies": {
     "react": "^19.2.8",

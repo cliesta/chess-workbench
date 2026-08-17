@@ -17,6 +17,13 @@ nvm use
 
 Install dependencies with `npm install`.
 
+Alternatively, the setup script selects the recorded Node version when nvm is
+available and installs the dependencies:
+
+```bash
+./scripts/setup.sh
+```
+
 ## Commands
 
 | Command                | Purpose                                     |
@@ -30,6 +37,14 @@ Install dependencies with `npm install`.
 | `npm run format:check` | Verify formatting without changing files.   |
 | `npm run build`        | Type-check and create the production build. |
 | `npm run preview`      | Serve the production build locally.         |
+| `npm run verify`       | Run every non-interactive quality check.    |
+
+The complete verification suite also has a convenience wrapper that selects
+the recorded Node version when nvm is available:
+
+```bash
+./scripts/verify.sh
+```
 
 ## Application entry points
 
