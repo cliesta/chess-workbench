@@ -86,3 +86,18 @@ and React behaviour through fake engines. A real Stockfish smoke test also
 completed the prescribed search and produced iterative output and a final best
 move. MultiPV, evaluation bars, PGN analysis, caching, adjustable settings, and
 all later workbench features remain intentionally unstarted.
+
+---
+
+# 2026-08-18 — Development pause
+
+Development is pausing with Milestones 0–2 complete. The current application is
+a usable board and FEN editor with one client-side Stockfish analysis line. The
+repository's full `npm run verify` quality gate passes with 57 tests, and the
+real Stockfish lite build has completed the intended 1.5-second search smoke
+test.
+
+No Milestone 3 design or implementation has begun. The next session should start
+by reviewing the product direction and choosing the next deliberately small
+milestone rather than assuming that MultiPV, evaluation bars, PGN support, or
+other later features should come next.
