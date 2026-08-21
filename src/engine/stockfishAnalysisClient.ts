@@ -5,6 +5,7 @@ import type {
   AnalysisUpdate,
   PositionAnalysisEngine,
 } from "./types";
+import { STOCKFISH_WORKER_URL } from "./stockfishAssets";
 import { normalizeEvaluation, parseUciMessage } from "./uci";
 
 const STARTUP_TIMEOUT_MS = 30_000;
@@ -363,8 +364,7 @@ export function createStockfishAnalysisClient(): PositionAnalysisEngine {
       );
     }
 
-    const workerUrl = `${import.meta.env.BASE_URL}stockfish/stockfish-18-lite-single.js`;
-    return new Worker(workerUrl, { name: "stockfish-analysis" });
+    return new Worker(STOCKFISH_WORKER_URL, { name: "stockfish-analysis" });
   });
 }
 

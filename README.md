@@ -1,8 +1,9 @@
 # Chess Workbench
 
 Chess Workbench is a personal chess-learning application. It currently provides
-an interactive board for loading FEN positions and making legal moves; chess
-analysis features will be added in later milestones.
+an interactive board for loading FEN positions and making legal moves, plus
+client-side Stockfish analysis showing depth, a White-relative evaluation, and
+one human-readable principal variation.
 
 ## Prerequisites
 
@@ -55,3 +56,12 @@ root React component from `src/App.tsx` and loads the global stylesheet from
 The normalized FEN held by `App` is the current position. Chess rules and direct
 `chess.js` use are contained in `src/chess/position.ts`, while
 `src/components/PositionBoard.tsx` adapts the visual board to application events.
+
+## Production deployment
+
+The production target is Cloudflare Pages. GitHub Actions runs the complete
+verification suite on every push, while Cloudflare builds `main` directly as a
+Vite static application.
+
+See [docs/deployment.md](docs/deployment.md) for the reproducible build,
+one-time setup, production checks, caching policy, and rollback procedure.

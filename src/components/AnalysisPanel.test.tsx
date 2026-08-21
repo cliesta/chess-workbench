@@ -145,6 +145,15 @@ describe("AnalysisPanel", () => {
     view.unmount();
     expect(engine.dispose).toHaveBeenCalledOnce();
   });
+
+  test("links to the source and licence for the deployed engine version", () => {
+    const engine = new FakeAnalysisEngine();
+    render(<AnalysisPanel fen={STARTING_FEN} createEngine={() => engine} />);
+
+    expect(
+      screen.getByRole("link", { name: "Stockfish source and licence" }),
+    ).toHaveAttribute("href", "/stockfish/18.0.8/SOURCE.txt");
+  });
 });
 
 describe("formatEvaluation", () => {

@@ -1,4 +1,5 @@
 import { formatEvaluation } from "../engine/formatEvaluation";
+import { STOCKFISH_SOURCE_URL } from "../engine/stockfishAssets";
 import {
   usePositionAnalysis,
   type PositionAnalysisEngineFactory,
@@ -51,10 +52,7 @@ export function AnalysisPanel({ fen, createEngine }: AnalysisPanelProps) {
           {analysis.errorMessage}
         </p>
       )}
-      <a
-        className="analysis-license"
-        href={`${import.meta.env.BASE_URL}stockfish/SOURCE.txt`}
-      >
+      <a className="analysis-license" href={STOCKFISH_SOURCE_URL}>
         Stockfish source and licence
       </a>
     </section>

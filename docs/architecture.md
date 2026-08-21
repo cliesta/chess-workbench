@@ -52,7 +52,32 @@ strings rather than raw engine coordinates.
 
 The pinned `stockfish` npm package supplies the lite single-thread JavaScript and
 Wasm pair. A small pre-development/pre-build script copies only those files,
-GPLv3 text, and exact source information to generated `public/stockfish/` assets.
-Vite serves them unchanged, separate from the main application bundle. The
-single-thread build avoids SharedArrayBuffer and cross-origin-isolation
-requirements.
+GPLv3 text, and exact source information to generated
+`public/stockfish/18.0.8/` assets. Application code uses one shared module for
+the versioned Worker and provenance URLs. The copy step rejects a package
+version that does not match the URL, preventing an engine upgrade from silently
+reusing an immutable cache entry. Vite serves the generated files unchanged,
+separate from the main application bundle. The single-thread build avoids
+SharedArrayBuffer and cross-origin-isolation requirements.
+
+## Production delivery
+
+The production application is a static Vite build in `dist/`; it has no runtime
+server, backend, environment variables, or secrets. The repository is prepared
+for one approved production topology: GitHub becomes the canonical repository,
+and Cloudflare Pages becomes the single production host serving the application
+from `/`. A small GitHub Actions workflow runs `npm ci` and `npm run verify` on
+every push. Once the external connection is configured, Cloudflare independently
+builds pushes to `main` with `npm run build` and publishes `dist/`.
+
+`public/_headers` defines the browser cache boundary. The HTML entry point
+always revalidates. Vite's content-hashed application assets and the exact-
+version Stockfish directory are immutable for one year. A future engine upgrade
+must change the npm pin, the generated provenance, and the versioned application
+URL together.
+
+Cloudflare branch previews are optional. Direct pushes to `main` are permitted
+for this solo project, so local verification is the normal pre-push safeguard;
+GitHub Actions reports the independent result rather than acting as a protected-
+branch gate. Deployment settings, production checks, and rollback are recorded
+in `docs/deployment.md`.

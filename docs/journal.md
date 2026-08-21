@@ -101,3 +101,39 @@ No Milestone 3 design or implementation has begun. The next session should start
 by reviewing the product direction and choosing the next deliberately small
 milestone rather than assuming that MultiPV, evaluation bars, PGN support, or
 other later features should come next.
+
+---
+
+# 2026-08-21 — Milestone 3: Repository deployment preparation
+
+The repository is now prepared for the approved Cloudflare Pages deployment,
+but no external repository or production site has been created yet. GitHub will
+become the sole canonical repository rather than mirroring the existing
+self-hosted GitLab remote. The local production branch has been renamed from
+`master` to `main`. A minimal GitHub Actions workflow runs the complete quality
+gate on every push; direct pushes to `main` remain allowed for this solo project.
+
+Stockfish runtime files now use the exact-version path
+`stockfish/18.0.8/`. The build removes obsolete generated engine files before
+copying the matching Worker loader, Wasm binary, GPLv3 text, and expanded
+provenance record from the pinned npm package. The application uses the same
+versioned base for Worker creation and its visible source/licence link. This
+makes a one-year immutable cache safe: a future engine upgrade must change the
+URL rather than overwrite an already cached file.
+
+Cloudflare's tracked `_headers` file makes HTML revalidate while allowing
+content-hashed Vite assets and exact-version engine assets to remain cached for
+one year. The deployment runbook records the clean build, Cloudflare settings,
+normal direct-push workflow, production checks, engine-failure test, licence
+inspection, and dashboard rollback procedure.
+
+The complete `npm run verify` gate passes under Node 24 with 59 tests, linting,
+formatting, type checking, and a production build. Inspection of `dist/`
+confirmed there are no unversioned engine files and that the loader, Wasm, and
+licence are byte-for-byte copies of `stockfish@18.0.8`. A local Vite preview
+served the versioned Worker, provenance, and licence successfully and served the
+Wasm as `application/wasm`.
+
+Milestone 3 is not complete until the owner creates the public GitHub repository,
+connects it to Cloudflare Pages, and the production checklist passes at the
+stable public URL.
