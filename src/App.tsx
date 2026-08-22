@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import { findReviewMoments } from "./analysis/reviewMoments";
 import { parseGame, type ImportedGame } from "./chess/game";
 import {
@@ -17,6 +17,7 @@ import { AnalysisPanel } from "./components/AnalysisPanel";
 import { GameReviewPanel } from "./components/GameReviewPanel";
 import { PositionBoard } from "./components/PositionBoard";
 import { PositionChangesPanel } from "./components/PositionChangesPanel";
+import { PositionControls } from "./components/PositionControls";
 import { PositionInsightsPanel } from "./components/PositionInsightsPanel";
 import { PromotionDialog } from "./components/PromotionDialog";
 import {
@@ -61,6 +62,7 @@ function App({ createEngine }: AppProps = {}) {
   const [selectedInsightSquare, setSelectedInsightSquare] = useState<
     string | null
   >(null);
+  const boardPositionRef = useRef<HTMLElement>(null);
   const positionFen =
     workspace.kind === "position"
       ? workspace.fen
@@ -92,6 +94,12 @@ function App({ createEngine }: AppProps = {}) {
         : [],
     [currentGame, analysis.gameAnalysis.results],
   );
+  const boardPositionLabel =
+    currentGame && currentGamePositionIndex !== null
+      ? formatBoardPositionLabel(
+          currentGame.positions[currentGamePositionIndex],
+        )
+      : "Current position";
 
   function commitPosition(fen: string, changes: PositionChanges | null) {
     setWorkspace({ kind: "position", fen, changes });
@@ -135,7 +143,7 @@ function App({ createEngine }: AppProps = {}) {
     setSelectedInsightSquare(null);
   }
 
-  function handleGameNavigation(positionIndex: number) {
+  function handleGameNavigation(positionIndex: number, revealBoard = false) {
     if (workspace.kind !== "game") {
       return;
     }
@@ -151,6 +159,24 @@ function App({ createEngine }: AppProps = {}) {
     setFenError(null);
     setPendingPromotion(null);
     setSelectedInsightSquare(null);
+
+    if (revealBoard) {
+      revealBoardOnNarrowScreen();
+    }
+  }
+
+  function revealBoardOnNarrowScreen() {
+    if (
+      typeof window.matchMedia !== "function" ||
+      !window.matchMedia("(max-width: 51.999rem)").matches
+    ) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      boardPositionRef.current?.scrollIntoView?.({ block: "start" });
+      boardPositionRef.current?.focus({ preventScroll: true });
+    });
   }
 
   function handleMove(from: string, to: string) {
@@ -199,68 +225,93 @@ function App({ createEngine }: AppProps = {}) {
       </header>
 
       <div className="workbench">
-        <PositionBoard
-          position={positionFen}
-          allowDragging={pendingPromotion === null}
-          onMove={handleMove}
-          highlightedTargetSquare={selectedFinding?.piece.square}
-          highlightedAttackerSquares={selectedFinding?.attackers.map(
-            ({ square }) => square,
-          )}
-        />
+        <section
+          ref={boardPositionRef}
+          className="board-column"
+          aria-label={boardPositionLabel}
+          tabIndex={-1}
+        >
+          <PositionBoard
+            position={positionFen}
+            allowDragging={pendingPromotion === null}
+            onMove={handleMove}
+            highlightedTargetSquare={selectedFinding?.piece.square}
+            highlightedAttackerSquares={selectedFinding?.attackers.map(
+              ({ square }) => square,
+            )}
+          />
+        </section>
 
         <div className="side-panel">
-          <GameReviewPanel
-            pgnDraft={pgnDraft}
-            error={pgnError}
-            game={currentGame}
-            positionIndex={currentGamePositionIndex}
-            gameAnalysis={analysis.gameAnalysis}
-            reviewMoments={reviewMoments}
-            canAnalyseGame={analysis.canAnalyseGame}
-            onDraftChange={setPgnDraft}
-            onLoad={handleGameLoad}
-            onNavigate={handleGameNavigation}
-            onStartAnalysis={analysis.startGameAnalysis}
-            onCancelAnalysis={analysis.cancelGameAnalysis}
-          />
-
-          <section
-            className="position-controls"
-            aria-labelledby="position-title"
-          >
-            <h2 id="position-title">Position</h2>
-            <form onSubmit={handleFenSubmit}>
-              <label htmlFor="fen-input">FEN</label>
-              <input
-                id="fen-input"
-                type="text"
-                value={fenDraft}
-                onChange={(event) => setFenDraft(event.target.value)}
-                aria-invalid={fenError !== null}
-                aria-describedby={fenError ? "fen-error" : undefined}
-                autoCapitalize="none"
-                autoComplete="off"
-                spellCheck={false}
+          {currentGame && currentGamePositionIndex !== null ? (
+            <GameReviewPanel
+              pgnDraft={pgnDraft}
+              error={pgnError}
+              game={currentGame}
+              positionIndex={currentGamePositionIndex}
+              gameAnalysis={analysis.gameAnalysis}
+              reviewMoments={reviewMoments}
+              canAnalyseGame={analysis.canAnalyseGame}
+              positionDetails={
+                <>
+                  <AnalysisPanel analysis={analysis.positionAnalysis} />
+                  <PositionChangesPanel changes={lastPositionChanges} />
+                  <PositionInsightsPanel
+                    insights={insights}
+                    selectedSquare={selectedInsightSquare}
+                    onSelectSquare={setSelectedInsightSquare}
+                  />
+                  <PositionControls
+                    fenDraft={fenDraft}
+                    error={fenError}
+                    collapsedForGame
+                    onDraftChange={setFenDraft}
+                    onSubmit={handleFenSubmit}
+                  />
+                </>
+              }
+              onDraftChange={setPgnDraft}
+              onLoad={handleGameLoad}
+              onNavigate={handleGameNavigation}
+              onRevealPosition={(positionIndex) =>
+                handleGameNavigation(positionIndex, true)
+              }
+              onStartAnalysis={analysis.startGameAnalysis}
+              onCancelAnalysis={analysis.cancelGameAnalysis}
+            />
+          ) : (
+            <>
+              <PositionControls
+                fenDraft={fenDraft}
+                error={fenError}
+                onDraftChange={setFenDraft}
+                onSubmit={handleFenSubmit}
               />
-              {fenError && (
-                <p id="fen-error" className="error-message" role="alert">
-                  {fenError}
-                </p>
-              )}
-              <button type="submit">Load position</button>
-            </form>
-          </section>
-
-          <PositionInsightsPanel
-            insights={insights}
-            selectedSquare={selectedInsightSquare}
-            onSelectSquare={setSelectedInsightSquare}
-          />
-
-          <PositionChangesPanel changes={lastPositionChanges} />
-
-          <AnalysisPanel analysis={analysis.positionAnalysis} />
+              <GameReviewPanel
+                pgnDraft={pgnDraft}
+                error={pgnError}
+                game={null}
+                positionIndex={null}
+                gameAnalysis={analysis.gameAnalysis}
+                reviewMoments={[]}
+                canAnalyseGame={false}
+                positionDetails={null}
+                onDraftChange={setPgnDraft}
+                onLoad={handleGameLoad}
+                onNavigate={handleGameNavigation}
+                onRevealPosition={handleGameNavigation}
+                onStartAnalysis={analysis.startGameAnalysis}
+                onCancelAnalysis={analysis.cancelGameAnalysis}
+              />
+              <AnalysisPanel analysis={analysis.positionAnalysis} />
+              <PositionChangesPanel changes={lastPositionChanges} />
+              <PositionInsightsPanel
+                insights={insights}
+                selectedSquare={selectedInsightSquare}
+                onSelectSquare={setSelectedInsightSquare}
+              />
+            </>
+          )}
         </div>
       </div>
 
@@ -273,6 +324,15 @@ function App({ createEngine }: AppProps = {}) {
       )}
     </main>
   );
+}
+
+function formatBoardPositionLabel(position: ImportedGame["positions"][number]) {
+  if (!position.move || position.moveNumber === undefined) {
+    return "Game start position";
+  }
+
+  const separator = position.move.color === "white" ? ". " : "... ";
+  return `Position after ${position.moveNumber}${separator}${position.move.san}`;
 }
 
 export default App;

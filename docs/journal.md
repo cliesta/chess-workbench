@@ -341,3 +341,38 @@ found an allowed mate and an ordinary evaluation loss, navigated every position
 consumer together, hid provisional results during a rerun, retained a partial
 moment after cancellation, fit at 390 pixels without horizontal overflow, and
 produced no browser-console warnings or errors.
+
+---
+
+# 2026-08-22 — Milestone 9: Workspace usability and navigation
+
+The workbench now keeps related controls and explanations close enough for
+practical game review. A loaded game replaces its permanent PGN textarea with a
+compact summary and explicit replacement action. Its current move, counter,
+retained evaluation, and navigation controls appear together above two small
+task views: Review contains the whole-game pass, Review moments, and a bounded
+move list; Position details contains Analysis, What changed?, Position insights,
+and a clearly mode-changing standalone-FEN disclosure.
+
+This is a presentation change over the existing workspace authority. Switching
+views never changes the selected ply or engine result. Replacement drafts remain
+available when collapsed, invalid input stays visible without discarding the
+game, and a new game returns to Review. Long move lists scroll internally and
+reveal their selected move rather than increasing the document indefinitely.
+
+The board column now sticks within a desktop viewport and is capped by viewport
+height. On narrow screens it remains in ordinary flow; selecting a Review moment
+or move-list entry reveals and focuses a named position destination, while the
+nearby First/Previous/Next/Last toolbar does not repeatedly move the document.
+The application header and surrounding spacing are also more compact without a
+visual rebrand.
+
+The complete verification gate passes under Node 24 with 193 tests, including
+collapsed setup controls, accessible task views, toolbar evaluation identity,
+preserved engine/game lifecycles, internal move reveal, and narrow-screen focus
+transfer. Browser checks with the real Stockfish Worker reduced a 10-move
+desktop Review page from roughly 2,993 to 1,341 pixels and an analysed narrow
+Review page from roughly 3,605 to 2,100 pixels. At 1280 × 720 the scrolled board
+remained fully visible from 16 to 677 pixels; 320-pixel layouts had no horizontal
+overflow; toolbar navigation preserved document scroll; and the console had no
+warnings or errors.

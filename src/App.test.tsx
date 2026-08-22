@@ -110,8 +110,19 @@ const shortGame = `
 `;
 
 function loadGame(pgn = shortGame) {
+  if (!screen.queryByLabelText("PGN")) {
+    fireEvent.click(screen.getByRole("button", { name: "Load another game" }));
+  }
   fireEvent.change(screen.getByLabelText("PGN"), { target: { value: pgn } });
   fireEvent.click(screen.getByRole("button", { name: "Load game" }));
+}
+
+function showPositionDetails() {
+  fireEvent.click(screen.getByRole("tab", { name: "Position details" }));
+}
+
+function openStandaloneFen() {
+  fireEvent.click(screen.getByText("Load a standalone FEN"));
 }
 
 test("shows the starting position in the board and FEN input", () => {
@@ -380,6 +391,8 @@ test("cancels promotion with Escape without changing the position", () => {
 test("loads a PGN at its initial position and navigates every position consumer together", () => {
   render(<App />);
   loadGame();
+  showPositionDetails();
+  openStandaloneFen();
 
   expect(screen.getByText("Jane Player vs Alex Opponent")).toBeVisible();
   expect(screen.getByText("Start position")).toBeVisible();
@@ -420,6 +433,7 @@ test("offers explicit whole-game analysis only for a loaded game", () => {
 test("supports jumping and keeps the producing-move report when navigating backward", () => {
   render(<App />);
   loadGame();
+  showPositionDetails();
 
   fireEvent.click(screen.getByRole("button", { name: "Last" }));
   expect(screen.getByText("After 2. Nf3")).toBeVisible();
@@ -433,14 +447,54 @@ test("supports jumping and keeps the producing-move report when navigating backw
     screen.getByRole("region", { name: "What changed?" }),
   ).toHaveTextContent("After e5");
 
+  fireEvent.click(screen.getByRole("tab", { name: "Review" }));
   fireEvent.click(screen.getByRole("button", { name: "Go to after 1. e4" }));
   expect(screen.getByText("After 1. e4")).toBeVisible();
+});
+
+test("reveals and focuses the selected board position from a narrow move list", () => {
+  const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+  const scrollIntoView = vi.fn();
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+    configurable: true,
+    value: scrollIntoView,
+  });
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn(() => ({ matches: true })),
+  );
+  vi.stubGlobal(
+    "requestAnimationFrame",
+    vi.fn((callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    }),
+  );
+
+  try {
+    render(<App />);
+    loadGame();
+    fireEvent.click(screen.getByRole("button", { name: "Go to after 1. e4" }));
+
+    expect(
+      screen.getByRole("region", { name: "Position after 1. e4" }),
+    ).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" });
+  } finally {
+    vi.unstubAllGlobals();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: originalScrollIntoView,
+    });
+  }
 });
 
 test("keeps the selected game position when a replacement PGN is invalid", () => {
   render(<App />);
   loadGame();
   fireEvent.click(screen.getByRole("button", { name: "Next" }));
+  showPositionDetails();
+  openStandaloneFen();
   const selectedFen = screen.getByLabelText("FEN").getAttribute("value");
 
   loadGame("1. e4 e5 2. NotAMove");
@@ -458,6 +512,8 @@ test("a valid FEN exits game review while retaining the PGN draft", () => {
   loadGame();
   const standaloneFen = "4k3/8/8/8/8/8/8/4K3 b - - 0 23";
 
+  showPositionDetails();
+  openStandaloneFen();
   fireEvent.change(screen.getByLabelText("FEN"), {
     target: { value: standaloneFen },
   });
@@ -475,6 +531,8 @@ test("invalid FEN and illegal moves stay in game review", () => {
   render(<App />);
   loadGame();
 
+  showPositionDetails();
+  openStandaloneFen();
   fireEvent.change(screen.getByLabelText("FEN"), {
     target: { value: "not a fen" },
   });
@@ -528,6 +586,7 @@ test("navigation clears a selected insight highlight", () => {
 
 1. Qe3 *
   `);
+  showPositionDetails();
   fireEvent.click(
     screen.getByRole("button", { name: /White queen on d4.*Black rook on a4/ }),
   );

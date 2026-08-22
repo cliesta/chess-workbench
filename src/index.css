@@ -46,7 +46,7 @@ body {
 .app-shell {
   width: min(76rem, 100%);
   margin: 0 auto;
-  padding: clamp(1.25rem, 4vw, 3.5rem);
+  padding: clamp(1rem, 2.5vw, 2rem);
 }
 
 header {
@@ -66,7 +66,7 @@ header::before {
 h1 {
   margin: 0;
   color: #f4f6f8;
-  font-size: clamp(2.15rem, 6vw, 3.6rem);
+  font-size: clamp(2rem, 5vw, 3rem);
   font-weight: 750;
   letter-spacing: -0.045em;
   line-height: 1;
@@ -79,7 +79,7 @@ p {
 
 header p {
   max-width: 38rem;
-  margin-top: 0.85rem;
+  margin-top: 0.55rem;
   color: var(--text-muted);
   font-size: 1.05rem;
 }
@@ -87,8 +87,19 @@ header p {
 .workbench {
   display: grid;
   gap: clamp(1.5rem, 4vw, 3.5rem);
-  margin-top: clamp(2rem, 5vw, 3.5rem);
+  margin-top: clamp(1.4rem, 3vw, 2.25rem);
   align-items: start;
+}
+
+.board-column {
+  min-width: 0;
+  scroll-margin-top: 1rem;
+}
+
+.board-column:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 0.35rem;
+  border-radius: 0.85rem;
 }
 
 .board {
@@ -345,7 +356,8 @@ textarea:focus {
 
 input:focus-visible,
 textarea:focus-visible,
-button:focus-visible {
+button:focus-visible,
+summary:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
@@ -395,12 +407,99 @@ button:disabled {
   font-size: 0.88rem;
 }
 
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.position-controls-disclosure {
+  padding: 0;
+  overflow: hidden;
+}
+
+.position-controls-disclosure summary {
+  padding: 1rem 1.1rem;
+  color: #dbe2e8;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.position-controls-disclosure[open] summary {
+  border-bottom: 1px solid var(--border);
+}
+
+.position-controls-disclosure > form,
+.position-controls-disclosure > .field-note {
+  margin-right: 1.1rem;
+  margin-left: 1.1rem;
+}
+
+.position-controls-disclosure > .field-note {
+  margin-top: 1rem;
+}
+
+.position-controls-disclosure > form {
+  margin-bottom: 1.1rem;
+}
+
+.game-replace-button {
+  margin-bottom: 0.25rem;
+}
+
 .game-navigation {
   display: grid;
   gap: 0.9rem;
   margin-top: 1.3rem;
   padding-top: 1.2rem;
   border-top: 1px solid var(--border);
+}
+
+.game-position-toolbar {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.game-task-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+  padding: 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: rgb(5 9 13 / 20%);
+}
+
+.game-task-tab {
+  width: 100%;
+  padding: 0.6rem 0.7rem;
+  border-color: transparent;
+  color: var(--text-muted);
+  background: transparent;
+  font-size: 0.88rem;
+}
+
+.game-task-tab:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: rgb(255 255 255 / 4%);
+}
+
+.game-task-tab[aria-selected="true"] {
+  border-color: rgb(214 164 83 / 48%);
+  color: var(--text);
+  background: rgb(214 164 83 / 9%);
+}
+
+.game-task-panel {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.game-position-details > .analysis-panel,
+.game-position-details > .position-changes-panel,
+.game-position-details > .position-insights-panel {
+  box-shadow: none;
 }
 
 .game-analysis-controls {
@@ -551,8 +650,25 @@ button:disabled {
   display: grid;
   gap: 0.35rem;
   margin: 0;
-  padding: 0;
+  max-height: 18rem;
+  padding: 0.2rem 0.35rem 0.2rem 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
   list-style: none;
+}
+
+.game-move-list-container {
+  min-width: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: rgb(5 9 13 / 14%);
+}
+
+.game-move-list-container h3 {
+  margin: 0 0 0.7rem;
+  color: #dbe2e8;
+  font-size: 0.98rem;
 }
 
 .game-move-list li {
@@ -581,6 +697,7 @@ button:disabled {
   font-size: 0.86rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  scroll-margin-block: 0.25rem;
 }
 
 .move-evaluation {
@@ -664,5 +781,14 @@ button:disabled {
 @media (min-width: 52rem) {
   .workbench {
     grid-template-columns: minmax(0, 3fr) minmax(18rem, 2fr);
+  }
+
+  .board-column {
+    position: sticky;
+    top: 1rem;
+  }
+
+  .board-column .board {
+    max-width: min(42rem, calc(100vh - 2rem));
   }
 }

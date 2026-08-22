@@ -35,13 +35,34 @@ position-insight comparison to create an immutable main-line game. It imports
 both chess-domain modules so `position.ts` does not acquire a circular
 dependency on its own comparison consumer.
 
-`GameReviewPanel` renders the PGN draft, supported headers, first/previous/next/
-last navigation, and an accessible SAN move list. It has no rules or parser
-responsibility. Selecting a ply updates the workspace index and synchronizes
-the FEN draft. A valid direct FEN load or completed legal board move explicitly
-returns to standalone mode; invalid input, illegal moves, and cancelled
-promotions leave game review intact. Stockfish continues to analyse only the
-single derived current FEN unless the user starts the explicit whole-game pass.
+The visible layout follows that same workspace discriminator. Standalone mode
+puts its FEN form first and keeps PGN import available as a separate **Review a
+game** card. A loaded game collapses its PGN editor behind **Load another game**
+and puts the game summary plus first/previous/next/last navigation before other
+game content. Its editable FEN form moves behind a disclosure that explicitly
+says a valid load leaves review. Drafts remain ordinary UI state and are not
+discarded merely because their controls are collapsed.
+
+`GameReviewPanel` has no rules or parser responsibility. Its loaded-game content
+uses two local presentation views. **Review** contains the whole-game engine
+controls, Review moments, and an internally scrolling SAN move list whose
+selected step is kept visible. **Position details** reuses Analysis, What
+changed?, Position insights, and the standalone-FEN disclosure. Changing views
+does not change the position or analysis; replacing the game resets the view to
+Review. Selecting a ply still updates the workspace index and synchronizes the
+FEN draft.
+
+At desktop widths the board column is sticky and capped by viewport height, so
+it remains available while either task view scrolls. On narrow screens the
+board stays in normal document flow. Review-moment and move-list actions then
+reveal and focus a named board-position region, while nearby toolbar navigation
+changes position without repeatedly moving the page. This responsive behavior
+is presentational and does not create another selected-position authority.
+
+A valid direct FEN load or completed legal board move explicitly returns to
+standalone mode; invalid input, illegal moves, and cancelled promotions leave
+game review intact. Stockfish continues to analyse only the single derived
+current FEN unless the user starts the explicit whole-game pass.
 
 Whole-game engine output is ephemeral state separate from `ImportedGame`. Its
 result array aligns with the game's position indices and repeats each FEN as a

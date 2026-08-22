@@ -94,8 +94,14 @@ test("runs, navigates, and cancels a whole-game pass through the application", a
       principalVariationUsesRawNotation: false,
     });
   });
-  expect(screen.getByText("Analysing game")).toBeVisible();
-  expect(screen.getByText("+0.20")).toBeVisible();
+  fireEvent.click(screen.getByRole("tab", { name: "Position details" }));
+  expect(screen.getByRole("region", { name: "Analysis" })).toHaveTextContent(
+    "Analysing game",
+  );
+  expect(screen.getByRole("region", { name: "Analysis" })).toHaveTextContent(
+    "+0.20",
+  );
+  fireEvent.click(screen.getByRole("tab", { name: "Review" }));
 
   await act(async () => engine.requests[1]?.resolve("complete"));
   expect(screen.getByText("Analysing game: 1 of 3 positions")).toBeVisible();
@@ -112,8 +118,14 @@ test("runs, navigates, and cancels a whole-game pass through the application", a
       principalVariationUsesRawNotation: false,
     });
   });
-  expect(screen.getByText("Analysing game")).toBeVisible();
-  expect(screen.getByText("+0.12")).toBeVisible();
+  fireEvent.click(screen.getByRole("tab", { name: "Position details" }));
+  expect(screen.getByRole("region", { name: "Analysis" })).toHaveTextContent(
+    "Analysing game",
+  );
+  expect(screen.getByRole("region", { name: "Analysis" })).toHaveTextContent(
+    "+0.12",
+  );
+  fireEvent.click(screen.getByRole("tab", { name: "Review" }));
 
   await act(async () => engine.requests[2]?.resolve("complete"));
   expect(
@@ -142,6 +154,7 @@ test("invalid input preserves a run while a valid FEN exits and cancels it", asy
   await act(async () => engine.finishInitialization());
   fireEvent.click(screen.getByRole("button", { name: "Analyse game" }));
 
+  fireEvent.click(screen.getByRole("button", { name: "Load another game" }));
   fireEvent.change(screen.getByLabelText("PGN"), {
     target: { value: "1. e4 e5 2. NotAMove" },
   });
@@ -150,6 +163,8 @@ test("invalid input preserves a run while a valid FEN exits and cancels it", asy
   expect(engine.stop).not.toHaveBeenCalled();
   expect(screen.getByText("Analysing game: 0 of 3 positions")).toBeVisible();
 
+  fireEvent.click(screen.getByRole("tab", { name: "Position details" }));
+  fireEvent.click(screen.getByText("Load a standalone FEN"));
   fireEvent.change(screen.getByLabelText("FEN"), {
     target: { value: "4k3/8/8/8/8/8/8/4K3 w - - 0 1" },
   });
@@ -195,15 +210,17 @@ test("turns a completed game pass into a navigable review shortlist", async () =
   expect(screen.getByTestId("board-position")).toHaveTextContent(
     "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
   );
+  expect(
+    screen.getByRole("button", { name: "Show position after 1. e4" }),
+  ).toHaveAttribute("aria-current", "location");
+  fireEvent.click(screen.getByRole("tab", { name: "Position details" }));
+  fireEvent.click(screen.getByText("Load a standalone FEN"));
   expect(screen.getByLabelText("FEN")).toHaveValue(
     "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
   );
   expect(
     screen.getByRole("region", { name: "What changed?" }),
   ).toHaveTextContent("After e4");
-  expect(
-    screen.getByRole("button", { name: "Show position after 1. e4" }),
-  ).toHaveAttribute("aria-current", "location");
 });
 
 test("settles retained partial moments after cancellation and clears them on rerun", async () => {
@@ -230,6 +247,7 @@ test("settles retained partial moments after cancellation and clears them on rer
     screen.getByRole("region", { name: "Partial review moments" }),
   ).toHaveTextContent("White's position worsened by about 2.00 pawns.");
 
+  fireEvent.click(screen.getByRole("button", { name: "Load another game" }));
   fireEvent.change(screen.getByLabelText("PGN"), {
     target: { value: "1. e4 e5 2. NotAMove" },
   });

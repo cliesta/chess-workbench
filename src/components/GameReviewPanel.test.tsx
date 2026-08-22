@@ -63,9 +63,13 @@ function renderPanel(
     gameAnalysis: { ...idleGameAnalysis, results: [], totalCount: 0 },
     reviewMoments: [],
     canAnalyseGame: false,
+    positionDetails: (
+      <section aria-label="Position detail content">Details</section>
+    ),
     onDraftChange: vi.fn(),
     onLoad: vi.fn(),
     onNavigate: vi.fn(),
+    onRevealPosition: vi.fn(),
     onStartAnalysis: vi.fn(),
     onCancelAnalysis: vi.fn(),
     ...overrides,
@@ -129,9 +133,11 @@ test("renders metadata, move status, current step, and navigation callbacks", ()
   expect(props.onNavigate).toHaveBeenNthCalledWith(2, 0);
   expect(props.onNavigate).toHaveBeenNthCalledWith(3, 2);
   expect(props.onNavigate).toHaveBeenNthCalledWith(4, 2);
-  expect(props.onNavigate).toHaveBeenNthCalledWith(5, 2);
+  expect(props.onRevealPosition).toHaveBeenCalledWith(2);
   expect(
-    screen.getByText("Moving a piece or loading a FEN leaves game review."),
+    screen.getByText(
+      "Moving a piece or loading a standalone FEN leaves game review.",
+    ),
   ).toBeVisible();
 });
 
@@ -304,4 +310,100 @@ test("reports a terminal engine error without offering a known-broken retry", ()
   expect(
     screen.queryByRole("button", { name: "Analyse again" }),
   ).not.toBeInTheDocument();
+});
+
+test("collapses the PGN editor for a loaded game and restores focus on request", () => {
+  renderPanel({
+    game,
+    positionIndex: 0,
+    gameAnalysis: idleGameAnalysis,
+  });
+
+  expect(screen.queryByLabelText("PGN")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Load another game" }));
+
+  expect(screen.getByLabelText("PGN")).toHaveValue("1. e4 e5");
+  expect(screen.getByLabelText("PGN")).toHaveFocus();
+
+  fireEvent.click(screen.getByRole("button", { name: "Keep current game" }));
+  expect(screen.queryByLabelText("PGN")).not.toBeInTheDocument();
+});
+
+test("defaults to Review and keeps the selected task view during navigation", () => {
+  const props = renderPanel({
+    game,
+    positionIndex: 1,
+    gameAnalysis: idleGameAnalysis,
+  });
+
+  expect(screen.getByRole("tab", { name: "Review" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  expect(screen.getByRole("tab", { name: "Position details" })).toHaveProperty(
+    "tabIndex",
+    0,
+  );
+  expect(screen.getByRole("tabpanel", { name: "Review" })).toBeVisible();
+  expect(
+    screen.queryByRole("region", { name: "Position detail content" }),
+  ).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("tab", { name: "Position details" }));
+  expect(screen.getByRole("tab", { name: "Position details" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  expect(
+    screen.getByRole("region", { name: "Position detail content" }),
+  ).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: "Analyse game" }),
+  ).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+  expect(props.onNavigate).toHaveBeenCalledWith(2);
+  expect(screen.getByRole("tab", { name: "Position details" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+});
+
+test("puts matching selected-position evaluation in the toolbar", () => {
+  renderPanel({
+    game,
+    positionIndex: 1,
+    gameAnalysis: {
+      ...idleGameAnalysis,
+      status: "complete",
+      completedCount: 3,
+      results: [
+        null,
+        {
+          fen: "after-e4",
+          depth: 10,
+          evaluation: { kind: "centipawns", whiteCentipawns: -120 },
+          principalVariation: "1... e5",
+          principalVariationUsesRawNotation: false,
+        },
+        null,
+      ],
+    },
+  });
+
+  expect(screen.getByText("Evaluation −1.20")).toBeVisible();
+});
+
+test("orders the toolbar before task views in the accessible document", () => {
+  renderPanel({
+    game,
+    positionIndex: 0,
+    gameAnalysis: idleGameAnalysis,
+  });
+
+  const navigation = screen.getByLabelText("Game navigation");
+  const tabs = screen.getByRole("tablist", { name: "Game review view" });
+  expect(
+    navigation.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
 });
