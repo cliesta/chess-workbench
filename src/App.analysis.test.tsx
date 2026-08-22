@@ -166,11 +166,106 @@ test("invalid input preserves a run while a valid FEN exits and cancels it", asy
   );
 });
 
+test("turns a completed game pass into a navigable review shortlist", async () => {
+  const engine = new FakeAnalysisEngine();
+  render(<App createEngine={() => engine} />);
+  loadGame();
+  await act(async () => engine.finishInitialization());
+  fireEvent.click(screen.getByRole("button", { name: "Analyse game" }));
+
+  emitResult(engine, 1, 100, "1. d4 d5");
+  await act(async () => engine.requests[1]?.resolve("complete"));
+  emitResult(engine, 2, -80, "1... e5 2. Nf3");
+  await act(async () => engine.requests[2]?.resolve("complete"));
+  emitResult(engine, 3, -70, "2. Nf3");
+  await act(async () => engine.requests[3]?.resolve("complete"));
+
+  expect(
+    screen.getByRole("region", { name: "Review moments" }),
+  ).toHaveTextContent("White's position worsened by about 1.80 pawns.");
+  expect(
+    screen.getByText("Engine line before the move: 1. d4 d5"),
+  ).toBeVisible();
+
+  fireEvent.click(
+    screen.getByRole("button", { name: "Show position after 1. e4" }),
+  );
+
+  expect(screen.getByText("After 1. e4")).toBeVisible();
+  expect(screen.getByTestId("board-position")).toHaveTextContent(
+    "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+  );
+  expect(screen.getByLabelText("FEN")).toHaveValue(
+    "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+  );
+  expect(
+    screen.getByRole("region", { name: "What changed?" }),
+  ).toHaveTextContent("After e4");
+  expect(
+    screen.getByRole("button", { name: "Show position after 1. e4" }),
+  ).toHaveAttribute("aria-current", "location");
+});
+
+test("settles retained partial moments after cancellation and clears them on rerun", async () => {
+  const engine = new FakeAnalysisEngine();
+  render(<App createEngine={() => engine} />);
+  loadGame();
+  await act(async () => engine.finishInitialization());
+  fireEvent.click(screen.getByRole("button", { name: "Analyse game" }));
+
+  emitResult(engine, 1, 100, "1. d4");
+  await act(async () => engine.requests[1]?.resolve("complete"));
+  emitResult(engine, 2, -100, "1... e5");
+  await act(async () => engine.requests[2]?.resolve("complete"));
+
+  expect(
+    screen.getByText("Review moments will settle when the quick pass stops."),
+  ).toBeVisible();
+  expect(screen.queryByText(/worsened by about/)).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Cancel analysis" }));
+  await act(async () => engine.requests[3]?.resolve("interrupted"));
+
+  expect(
+    screen.getByRole("region", { name: "Partial review moments" }),
+  ).toHaveTextContent("White's position worsened by about 2.00 pawns.");
+
+  fireEvent.change(screen.getByLabelText("PGN"), {
+    target: { value: "1. e4 e5 2. NotAMove" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Load game" }));
+  expect(
+    screen.getByRole("region", { name: "Partial review moments" }),
+  ).toHaveTextContent("2.00 pawns");
+
+  fireEvent.click(screen.getByRole("button", { name: "Analyse again" }));
+  expect(
+    screen.getByText("Review moments will settle when the quick pass stops."),
+  ).toBeVisible();
+  expect(screen.queryByText(/2.00 pawns/)).not.toBeInTheDocument();
+});
+
 function loadGame() {
   fireEvent.change(screen.getByLabelText("PGN"), {
     target: { value: shortGame },
   });
   fireEvent.click(screen.getByRole("button", { name: "Load game" }));
+}
+
+function emitResult(
+  engine: FakeAnalysisEngine,
+  requestIndex: number,
+  whiteCentipawns: number,
+  principalVariation: string,
+) {
+  act(() => {
+    engine.emit(requestIndex, {
+      depth: 10,
+      evaluation: { kind: "centipawns", whiteCentipawns },
+      principalVariation,
+      principalVariationUsesRawNotation: false,
+    });
+  });
 }
 
 function deferred<T>() {

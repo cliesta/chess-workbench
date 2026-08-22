@@ -305,3 +305,39 @@ sequentially, display all retained evaluations, navigate to a pending position,
 cancel a rerun with partial results intact, and resume the selected-position
 search. The 390-pixel layout had no horizontal overflow, the versioned Worker was
 the only engine loader observed, and the console had no warnings or errors.
+
+---
+
+# 2026-08-22 — Milestone 8: Review moments
+
+Completed and interrupted whole-game passes now produce a short, deterministic
+study queue. Chess Workbench identifies at most three played moves that caused
+the largest clear deterioration for the moving player, shows the evaluation
+before and after, explains the measured transition in restrained language, and
+lets the user jump directly to the resulting position.
+
+The interpretation is intentionally narrower than move grading. Ordinary
+evaluation changes are converted from the existing White-perspective scores to
+the mover's perspective and must lose at least 75 centipawns. Clear mate
+reversals, allowed mates, and lost mates are ranked categorically ahead of
+centipawn losses; mate distances for the same winning side are ignored rather
+than converted into invented numeric losses. Missing or FEN-mismatched adjacent
+results cannot produce a moment.
+
+The feature adds no search and no dependency. A pure TypeScript module derives
+the shortlist from the immutable imported game and retained engine results.
+React calculates it rather than storing another authority. The presentation
+panel stays stable while a game pass runs, supports retained partial results
+after cancellation or failure, labels the pre-move SAN PV as an **Engine line**,
+and suppresses raw coordinate fallback. Its selected-position action delegates
+to existing game navigation.
+
+The complete verification gate passes under Node 24 with 185 tests, including
+both-color sign handling, the inclusive threshold boundary, mate transitions,
+ranking, malformed/missing inputs, raw-PV suppression, settled and partial UI
+states, and application navigation and rerun behavior. A local production-build
+browser check used the real Stockfish Worker on a five-position mating game. It
+found an allowed mate and an ordinary evaluation loss, navigated every position
+consumer together, hid provisional results during a rerun, retained a partial
+moment after cancellation, fit at 390 pixels without horizontal overflow, and
+produced no browser-console warnings or errors.

@@ -1,11 +1,13 @@
 import type { FormEvent } from "react";
 import type { ImportedGame } from "../chess/game";
 import type { ImportedGamePosition } from "../chess/game";
+import type { ReviewMoment } from "../analysis/reviewMoments";
 import { formatEvaluation } from "../engine/formatEvaluation";
 import {
   GAME_POSITION_MOVE_TIME_MS,
   type GameAnalysisState,
 } from "../engine/types";
+import { ReviewMomentsPanel } from "./ReviewMomentsPanel";
 
 type GameReviewPanelProps = {
   pgnDraft: string;
@@ -13,6 +15,7 @@ type GameReviewPanelProps = {
   game: ImportedGame | null;
   positionIndex: number | null;
   gameAnalysis: GameAnalysisState;
+  reviewMoments: ReviewMoment[];
   canAnalyseGame: boolean;
   onDraftChange: (pgn: string) => void;
   onLoad: () => void;
@@ -27,6 +30,7 @@ export function GameReviewPanel({
   game,
   positionIndex,
   gameAnalysis,
+  reviewMoments,
   canAnalyseGame,
   onDraftChange,
   onLoad,
@@ -78,6 +82,12 @@ export function GameReviewPanel({
             initialFen={game.positions[0].fen}
             onStart={onStartAnalysis}
             onCancel={onCancelAnalysis}
+          />
+          <ReviewMomentsPanel
+            status={gameAnalysis.status}
+            moments={reviewMoments}
+            selectedPositionIndex={positionIndex}
+            onNavigate={onNavigate}
           />
           <p className="game-position-status" aria-live="polite">
             <strong>

@@ -61,6 +61,7 @@ function renderPanel(
     game: null,
     positionIndex: null,
     gameAnalysis: { ...idleGameAnalysis, results: [], totalCount: 0 },
+    reviewMoments: [],
     canAnalyseGame: false,
     onDraftChange: vi.fn(),
     onLoad: vi.fn(),

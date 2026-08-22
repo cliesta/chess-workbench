@@ -140,9 +140,8 @@ an error; the position editor remains independent and usable.
 
 UCI centipawn and mate scores are normalized to White's perspective before they
 cross the boundary: positive always favours White. Principal variations are SAN
-strings rather than raw engine coordinates. Retained move-list evaluations are
-factual engine output only; no adjacent-score delta, move-quality label, graph,
-or review-moment ranking is calculated.
+strings rather than raw engine coordinates. The engine boundary retains factual
+output only; it does not calculate adjacent-score changes or grade moves.
 
 The pinned `stockfish` npm package supplies the lite single-thread JavaScript and
 Wasm pair. A small pre-development/pre-build script copies only those files,
@@ -153,6 +152,31 @@ version that does not match the URL, preventing an engine upgrade from silently
 reusing an immutable cache entry. Vite serves the generated files unchanged,
 separate from the main application bundle. The single-thread build avoids
 SharedArrayBuffer and cross-origin-isolation requirements.
+
+## Review moments
+
+`src/analysis/reviewMoments.ts` is a synchronous interpretation layer over the
+immutable imported game and its matching retained whole-game results. For each
+played move it requires both adjacent result FENs to match their corresponding
+game positions, then compares the before and after evaluations from the moving
+player's perspective. White centipawn utility uses the stored score directly;
+Black utility reverses its sign. A loss must be at least 75 centipawns to pass
+the deliberately conservative attention/noise filter.
+
+Forced-mate changes remain categorical rather than being assigned invented
+centipawn values. The module recognizes a mate reversal, allowing an opponent's
+mate, and losing one's own mate; it ignores same-winner mate-distance changes
+and mate scores whose winner is not represented. Candidates are ranked by
+those explicit categories, then centipawn loss and game order, and capped at
+three. This output is a study shortlist, not a move grade or accuracy score.
+
+`App` derives the list with `useMemo`; it does not store a second mutable review
+state. `ReviewMomentsPanel` renders only settled complete or retained partial
+results, uses the retained SAN principal variation from before the played move
+as a modest **Engine line**, and suppresses raw UCI fallback notation. Selecting
+a moment delegates to existing game navigation and therefore updates the board,
+FEN, insights, latest-move report, and Analysis panel through the same workspace
+authority. No additional Worker request or dependency is involved.
 
 ## Production delivery
 

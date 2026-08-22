@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from "react";
+import { findReviewMoments } from "./analysis/reviewMoments";
 import { parseGame, type ImportedGame } from "./chess/game";
 import {
   STARTING_FEN,
@@ -83,6 +84,13 @@ function App({ createEngine }: AppProps = {}) {
   );
   const selectedFinding = insights.attackedAndUndefended.find(
     ({ piece }) => piece.square === selectedInsightSquare,
+  );
+  const reviewMoments = useMemo(
+    () =>
+      currentGame
+        ? findReviewMoments(currentGame, analysis.gameAnalysis.results)
+        : [],
+    [currentGame, analysis.gameAnalysis.results],
   );
 
   function commitPosition(fen: string, changes: PositionChanges | null) {
@@ -208,6 +216,7 @@ function App({ createEngine }: AppProps = {}) {
             game={currentGame}
             positionIndex={currentGamePositionIndex}
             gameAnalysis={analysis.gameAnalysis}
+            reviewMoments={reviewMoments}
             canAnalyseGame={analysis.canAnalyseGame}
             onDraftChange={setPgnDraft}
             onLoad={handleGameLoad}
