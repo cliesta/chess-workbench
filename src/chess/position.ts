@@ -1,4 +1,10 @@
-import { Chess, SQUARES, type Square } from "chess.js";
+import {
+  Chess,
+  SQUARES,
+  type Color,
+  type PieceSymbol,
+  type Square,
+} from "chess.js";
 
 export const STARTING_FEN = new Chess().fen();
 
@@ -25,7 +31,53 @@ export type FormattedPrincipalVariation = {
   usesRawNotation: boolean;
 };
 
+export type InsightColor = "white" | "black";
+
+export type InsightPieceType =
+  "pawn" | "knight" | "bishop" | "rook" | "queen" | "king";
+
+export type InsightPiece = {
+  color: InsightColor;
+  type: InsightPieceType;
+  square: string;
+};
+
+export type MaterialCounts = Record<Exclude<InsightPieceType, "king">, number>;
+
+export type PositionInsights = {
+  sideToMove: InsightColor;
+  inCheck: boolean;
+  material: {
+    white: MaterialCounts;
+    black: MaterialCounts;
+    whitePoints: number;
+    blackPoints: number;
+    whiteMinusBlack: number;
+  };
+  attackedAndUndefended: Array<{
+    piece: InsightPiece;
+    attackers: InsightPiece[];
+  }>;
+};
+
 const squareSet = new Set<string>(SQUARES);
+
+const pieceTypeNames: Record<PieceSymbol, InsightPieceType> = {
+  p: "pawn",
+  n: "knight",
+  b: "bishop",
+  r: "rook",
+  q: "queen",
+  k: "king",
+};
+
+const materialValues: Record<keyof MaterialCounts, number> = {
+  pawn: 1,
+  knight: 3,
+  bishop: 3,
+  rook: 5,
+  queen: 9,
+};
 
 export function parsePosition(fen: string): ParsePositionResult {
   try {
@@ -88,6 +140,72 @@ export function attemptMove(
   }
 }
 
+export function getPositionInsights(fen: string): PositionInsights {
+  const chess = new Chess(fen);
+  const pieces = chess
+    .board()
+    .flat()
+    .filter((piece) => piece !== null)
+    .map((piece) => toInsightPiece(piece.color, piece.type, piece.square));
+  const white = emptyMaterialCounts();
+  const black = emptyMaterialCounts();
+
+  for (const piece of pieces) {
+    if (piece.type !== "king") {
+      const counts = piece.color === "white" ? white : black;
+      counts[piece.type] += 1;
+    }
+  }
+
+  const attackedAndUndefended = pieces
+    .filter((piece) => piece.type !== "king")
+    .flatMap((piece) => {
+      const square = asSquare(piece.square);
+      const ownColor = piece.color === "white" ? "w" : "b";
+      const opposingColor = ownColor === "w" ? "b" : "w";
+      const attackerSquares = chess.attackers(square, opposingColor);
+      const defenderSquares = chess.attackers(square, ownColor);
+
+      if (attackerSquares.length === 0 || defenderSquares.length > 0) {
+        return [];
+      }
+
+      const attackers = attackerSquares
+        .map((attackerSquare) => {
+          const attacker = chess.get(attackerSquare);
+          if (!attacker) {
+            throw new Error(`Missing attacker on ${attackerSquare}`);
+          }
+          return toInsightPiece(attacker.color, attacker.type, attackerSquare);
+        })
+        .sort(compareInsightPieces);
+
+      return [{ piece, attackers }];
+    })
+    .sort((left, right) => {
+      const colorOrder =
+        (left.piece.color === "white" ? 0 : 1) -
+        (right.piece.color === "white" ? 0 : 1);
+      return colorOrder || compareInsightPieces(left.piece, right.piece);
+    });
+
+  const whitePoints = materialPoints(white);
+  const blackPoints = materialPoints(black);
+
+  return {
+    sideToMove: chess.turn() === "w" ? "white" : "black",
+    inCheck: chess.inCheck(),
+    material: {
+      white,
+      black,
+      whitePoints,
+      blackPoints,
+      whiteMinusBlack: whitePoints - blackPoints,
+    },
+    attackedAndUndefended,
+  };
+}
+
 export function formatPrincipalVariation(
   fen: string,
   coordinateMoves: string[],
@@ -144,6 +262,40 @@ export function formatPrincipalVariation(
 
 function isSquare(value: string): value is Square {
   return squareSet.has(value);
+}
+
+function asSquare(value: string): Square {
+  if (!isSquare(value)) {
+    throw new Error(`Invalid board square: ${value}`);
+  }
+  return value;
+}
+
+function toInsightPiece(
+  color: Color,
+  type: PieceSymbol,
+  square: Square,
+): InsightPiece {
+  return {
+    color: color === "w" ? "white" : "black",
+    type: pieceTypeNames[type],
+    square,
+  };
+}
+
+function emptyMaterialCounts(): MaterialCounts {
+  return { pawn: 0, knight: 0, bishop: 0, rook: 0, queen: 0 };
+}
+
+function materialPoints(counts: MaterialCounts) {
+  return (Object.keys(materialValues) as Array<keyof MaterialCounts>).reduce(
+    (total, pieceType) => total + counts[pieceType] * materialValues[pieceType],
+    0,
+  );
+}
+
+function compareInsightPieces(left: InsightPiece, right: InsightPiece) {
+  return left.square.localeCompare(right.square);
 }
 
 function parseCoordinateMove(move: string) {

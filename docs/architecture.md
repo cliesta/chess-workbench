@@ -29,6 +29,29 @@ contains no rules. `PromotionDialog` collects the user's promotion choice.
 coordinate moves to numbered SAN by replaying them from the analysed FEN. This
 keeps direct `chess.js` use inside the same domain boundary.
 
+## Position insights
+
+`src/chess/position.ts` derives a plain `PositionInsights` snapshot from the
+canonical FEN. It reports the side to move, check status, conventional material
+counts and totals, and every non-king piece whose square is attacked by an
+opponent and not attacked by a friendly piece. The calculation is synchronous,
+has no React or Stockfish dependency, and does not create another source of
+position state.
+
+Loose-piece detection deliberately uses `chess.js`'s static attack-map
+semantics. Pinned pieces therefore count as attackers and defenders. The result
+is presented as an attention cue rather than proof that a piece is tactically
+lost; no capture search or engine evaluation participates in the rule.
+
+`App` derives insights whenever its authoritative FEN changes and owns only the
+currently selected finding square as presentation state. The
+`PositionInsightsPanel` renders explanatory text and selection buttons.
+`PositionBoard` remains a rules-free adapter: it converts the selected target
+and attacker squares into restrained square styles. Committing any new position
+clears the selection, while an invalid FEN draft leaves both the canonical
+position and its insights unchanged. This flow remains independent of the
+asynchronous engine lifecycle.
+
 ## Engine analysis
 
 `AnalysisPanel` receives the canonical `positionFen`. The

@@ -3,6 +3,7 @@ import {
   STARTING_FEN,
   attemptMove,
   formatPrincipalVariation,
+  getPositionInsights,
   parsePosition,
 } from "./position";
 
@@ -148,5 +149,132 @@ describe("formatPrincipalVariation", () => {
       complete: false,
       usesRawNotation: true,
     });
+  });
+});
+
+describe("getPositionInsights", () => {
+  test("describes the starting position", () => {
+    const insights = getPositionInsights(STARTING_FEN);
+
+    expect(insights.sideToMove).toBe("white");
+    expect(insights.inCheck).toBe(false);
+    expect(insights.material).toEqual({
+      white: { pawn: 8, knight: 2, bishop: 2, rook: 2, queen: 1 },
+      black: { pawn: 8, knight: 2, bishop: 2, rook: 2, queen: 1 },
+      whitePoints: 39,
+      blackPoints: 39,
+      whiteMinusBlack: 0,
+    });
+    expect(insights.attackedAndUndefended).toEqual([]);
+  });
+
+  test("reads Black to move from the FEN", () => {
+    expect(
+      getPositionInsights("4k3/8/8/8/8/8/8/4K3 b - - 0 1").sideToMove,
+    ).toBe("black");
+  });
+
+  test("reports check without listing the king as a loose piece", () => {
+    const insights = getPositionInsights("4k3/8/8/8/8/8/4r3/4K3 w - - 0 1");
+
+    expect(insights.inCheck).toBe(true);
+    expect(
+      insights.attackedAndUndefended.some(
+        (finding) => finding.piece.type === "king",
+      ),
+    ).toBe(false);
+  });
+
+  test.each([
+    ["white", "4k3/8/8/8/8/8/8/Q3K3 w - - 0 1", 9],
+    ["black", "q3k3/8/8/8/8/8/8/4K3 w - - 0 1", -9],
+  ] as const)("reports a %s material advantage", (_color, fen, balance) => {
+    expect(getPositionInsights(fen).material.whiteMinusBlack).toBe(balance);
+  });
+
+  test("counts promoted material instead of assuming a standard inventory", () => {
+    const material = getPositionInsights(
+      "4k3/8/8/8/8/8/8/Q2QK3 w - - 0 1",
+    ).material;
+
+    expect(material.white.queen).toBe(2);
+    expect(material.whitePoints).toBe(18);
+  });
+
+  test("reports an attacked and undefended target and its attacker", () => {
+    const finding = getPositionInsights(
+      "4k3/8/8/8/r2Q4/8/8/4K3 w - - 0 1",
+    ).attackedAndUndefended.find(({ piece }) => piece.square === "d4");
+
+    expect(finding).toEqual({
+      piece: { color: "white", type: "queen", square: "d4" },
+      attackers: [{ color: "black", type: "rook", square: "a4" }],
+    });
+  });
+
+  test("does not report a target whose square has a friendly defender", () => {
+    const findings = getPositionInsights(
+      "4k3/8/8/8/r2Q4/2B5/8/4K3 w - - 0 1",
+    ).attackedAndUndefended;
+
+    expect(findings.some(({ piece }) => piece.square === "d4")).toBe(false);
+  });
+
+  test("includes an attacked and undefended pawn", () => {
+    const findings = getPositionInsights(
+      "4k3/1b6/8/8/4P3/8/8/4K3 w - - 0 1",
+    ).attackedAndUndefended;
+
+    expect(findings).toContainEqual({
+      piece: { color: "white", type: "pawn", square: "e4" },
+      attackers: [{ color: "black", type: "bishop", square: "b7" }],
+    });
+  });
+
+  test("inspects pieces of both colours", () => {
+    const findings = getPositionInsights(
+      "4k3/8/8/8/r2Q4/8/8/4K3 w - - 0 1",
+    ).attackedAndUndefended;
+
+    expect(findings.map(({ piece }) => [piece.color, piece.square])).toEqual([
+      ["white", "d4"],
+      ["black", "a4"],
+    ]);
+  });
+
+  test("counts a pinned piece as an attacker", () => {
+    const findings = getPositionInsights(
+      "4k3/4n3/2B5/8/8/8/4R3/4K3 w - - 0 1",
+    ).attackedAndUndefended;
+
+    expect(findings).toContainEqual({
+      piece: { color: "white", type: "bishop", square: "c6" },
+      attackers: [{ color: "black", type: "knight", square: "e7" }],
+    });
+  });
+
+  test("counts a pinned piece as a defender", () => {
+    const findings = getPositionInsights(
+      "4r1k1/8/8/8/8/1b6/2N1R3/4K3 w - - 0 1",
+    ).attackedAndUndefended;
+
+    expect(findings.some(({ piece }) => piece.square === "c2")).toBe(false);
+  });
+
+  test("orders findings by colour then square and attackers by square", () => {
+    const findings = getPositionInsights(
+      "4k3/8/8/8/r2Q3r/8/2B5/4K3 w - - 0 1",
+    ).attackedAndUndefended;
+
+    expect(findings.map(({ piece }) => piece.square)).toEqual([
+      "d4",
+      "a4",
+      "h4",
+    ]);
+    expect(
+      findings
+        .find(({ piece }) => piece.square === "d4")
+        ?.attackers.map(({ square }) => square),
+    ).toEqual(["a4", "h4"]);
   });
 });

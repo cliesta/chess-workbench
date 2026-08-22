@@ -1,12 +1,14 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import {
   STARTING_FEN,
   attemptMove,
+  getPositionInsights,
   parsePosition,
   type PromotionPiece,
 } from "./chess/position";
 import { AnalysisPanel } from "./components/AnalysisPanel";
 import { PositionBoard } from "./components/PositionBoard";
+import { PositionInsightsPanel } from "./components/PositionInsightsPanel";
 import { PromotionDialog } from "./components/PromotionDialog";
 
 type PendingPromotion = {
@@ -21,11 +23,22 @@ function App() {
   const [fenError, setFenError] = useState<string | null>(null);
   const [pendingPromotion, setPendingPromotion] =
     useState<PendingPromotion | null>(null);
+  const [selectedInsightSquare, setSelectedInsightSquare] = useState<
+    string | null
+  >(null);
+  const insights = useMemo(
+    () => getPositionInsights(positionFen),
+    [positionFen],
+  );
+  const selectedFinding = insights.attackedAndUndefended.find(
+    ({ piece }) => piece.square === selectedInsightSquare,
+  );
 
   function commitPosition(fen: string) {
     setPositionFen(fen);
     setFenDraft(fen);
     setFenError(null);
+    setSelectedInsightSquare(null);
   }
 
   function handleFenSubmit(event: FormEvent<HTMLFormElement>) {
@@ -91,6 +104,10 @@ function App() {
           position={positionFen}
           allowDragging={pendingPromotion === null}
           onMove={handleMove}
+          highlightedTargetSquare={selectedFinding?.piece.square}
+          highlightedAttackerSquares={selectedFinding?.attackers.map(
+            ({ square }) => square,
+          )}
         />
 
         <div className="side-panel">
@@ -120,6 +137,12 @@ function App() {
               <button type="submit">Load position</button>
             </form>
           </section>
+
+          <PositionInsightsPanel
+            insights={insights}
+            selectedSquare={selectedInsightSquare}
+            onSelectSquare={setSelectedInsightSquare}
+          />
 
           <AnalysisPanel fen={positionFen} />
         </div>

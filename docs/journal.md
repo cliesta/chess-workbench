@@ -169,3 +169,35 @@ rapid position changes, narrow-screen usability, a clean console, and graceful
 degradation when engine assets fail. Milestone 3 and Phase 1 of the product
 roadmap are complete. The next milestone should begin the deliberately small
 Workbench Intelligence phase rather than add more raw engine presentation.
+
+---
+
+# 2026-08-22 — Milestone 4: Position insights
+
+Chess Workbench now provides its first deterministic, human-oriented position
+summary. A new panel identifies the side to move and check status, shows both
+sides' actual material counts and conventional 1/3/3/5/9 totals, and lists
+non-king pieces that are attacked by an opponent but not attacked by a friendly
+piece. Each finding names the target and its attackers and can add restrained,
+distinct target and attacker outlines to the board.
+
+The wording is intentionally explanatory. The interface defines these findings
+as loose pieces and explicitly says that the static warning is not proof that a
+piece can be won. It makes no tactical, move-quality, or engine-backed claim.
+The rule preserves `chess.js`'s documented attack-map semantics exactly: pinned
+pieces count as both attackers and defenders. Dedicated tests protect both
+directions of that boundary.
+
+The canonical FEN remains the only position state. `src/chess/position.ts`
+derives a plain insight snapshot synchronously and remains the only module that
+uses `chess.js` directly. `App` owns only the selected finding because the
+insight panel and board are siblings; every committed move, FEN, or promotion
+clears that selection and recomputes the snapshot. Invalid drafts do neither.
+The calculation is independent of Stockfish, so engine failure does not affect
+the panel.
+
+No dependency was added. The verification gate passes with 78 tests, including
+material sign and promotion cases, both-colour loose-piece detection, pinned
+attackers and defenders, stable ordering, accessible panel behavior, board-style
+adaptation, and application flows. Tactical motif detection and “what changed?”
+comparison remain explicitly outside this milestone.

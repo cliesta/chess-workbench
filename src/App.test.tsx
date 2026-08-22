@@ -8,14 +8,24 @@ vi.mock("./components/PositionBoard", () => ({
     position,
     allowDragging,
     onMove,
+    highlightedTargetSquare,
+    highlightedAttackerSquares,
   }: {
     position: string;
     allowDragging: boolean;
     onMove: (from: string, to: string) => boolean;
+    highlightedTargetSquare?: string;
+    highlightedAttackerSquares?: string[];
   }) => (
     <section aria-label="Chess board">
       <span data-testid="board-position">{position}</span>
       <span data-testid="dragging-enabled">{String(allowDragging)}</span>
+      <span data-testid="highlighted-target">
+        {highlightedTargetSquare ?? "none"}
+      </span>
+      <span data-testid="highlighted-attackers">
+        {highlightedAttackerSquares?.join(",") ?? "none"}
+      </span>
       <button type="button" onClick={() => onMove("e2", "e4")}>
         Move e2 to e4
       </button>
@@ -32,6 +42,7 @@ vi.mock("./components/PositionBoard", () => ({
 vi.mock("./components/AnalysisPanel", () => ({
   AnalysisPanel: ({ fen }: { fen: string }) => (
     <section aria-label="Analysis">
+      <p>Engine unavailable</p>
       <span data-testid="analysis-position">{fen}</span>
     </section>
   ),
@@ -45,6 +56,11 @@ test("shows the starting position in the board and FEN input", () => {
   ).toBeInTheDocument();
   expect(screen.getByTestId("board-position")).toHaveTextContent(STARTING_FEN);
   expect(screen.getByLabelText("FEN")).toHaveValue(STARTING_FEN);
+  expect(screen.getByText("White to move")).toBeInTheDocument();
+  expect(screen.getByText("No loose pieces found.")).toBeInTheDocument();
+  expect(
+    screen.getByText(/not proof that the piece can be won/i),
+  ).toBeVisible();
 });
 
 test("loads a valid FEN into the board and input", () => {
@@ -59,6 +75,7 @@ test("loads a valid FEN into the board and input", () => {
   expect(screen.getByTestId("board-position")).toHaveTextContent(fen);
   expect(screen.getByTestId("analysis-position")).toHaveTextContent(fen);
   expect(screen.getByLabelText("FEN")).toHaveValue(fen);
+  expect(screen.getByText("Black to move")).toBeInTheDocument();
 });
 
 test("shows an accessible error and keeps the board for invalid FEN", () => {
@@ -75,6 +92,7 @@ test("shows an accessible error and keeps the board for invalid FEN", () => {
   expect(screen.getByTestId("analysis-position")).toHaveTextContent(
     STARTING_FEN,
   );
+  expect(screen.getByText("White to move")).toBeInTheDocument();
 });
 
 test("clears a FEN error after loading a corrected position", () => {
@@ -102,6 +120,41 @@ test("updates the FEN after a legal board move", () => {
   const movedFen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
   expect(screen.getByLabelText("FEN")).toHaveValue(movedFen);
   expect(screen.getByTestId("board-position")).toHaveTextContent(movedFen);
+  expect(screen.getByText("Black to move")).toBeInTheDocument();
+});
+
+test("selects a finding for board highlights and clears it on position change", () => {
+  render(<App />);
+  const loosePieceFen = "4k3/8/8/8/r2Q4/8/8/4K3 w - - 0 1";
+
+  fireEvent.change(screen.getByLabelText("FEN"), {
+    target: { value: loosePieceFen },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Load position" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: /White queen on d4.*Black rook on a4/ }),
+  );
+
+  expect(screen.getByTestId("highlighted-target")).toHaveTextContent("d4");
+  expect(screen.getByTestId("highlighted-attackers")).toHaveTextContent("a4");
+
+  fireEvent.change(screen.getByLabelText("FEN"), {
+    target: { value: "4k3/8/8/8/8/8/8/4K3 b - - 0 1" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Load position" }));
+
+  expect(screen.getByTestId("highlighted-target")).toHaveTextContent("none");
+  expect(screen.getByTestId("highlighted-attackers")).toHaveTextContent("none");
+});
+
+test("keeps insights usable when analysis reports an engine error", () => {
+  render(<App />);
+
+  expect(screen.getByText("Engine unavailable")).toBeInTheDocument();
+  expect(
+    screen.getByRole("region", { name: "Position insights" }),
+  ).toBeVisible();
+  expect(screen.getByText("Equal")).toBeInTheDocument();
 });
 
 test("keeps the current FEN after an illegal board move", () => {
@@ -132,6 +185,9 @@ test("opens promotion choices and applies an underpromotion", () => {
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(screen.getByLabelText("FEN")).toHaveValue(
     "N3k3/8/8/8/8/8/8/4K3 b - - 0 1",
+  );
+  expect(screen.getByText("White:").parentElement).toHaveTextContent(
+    "Knight 1",
   );
 });
 
