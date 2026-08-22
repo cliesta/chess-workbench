@@ -32,6 +32,15 @@ vi.mock("./components/PositionBoard", () => ({
       <button type="button" onClick={() => onMove("e2", "e5")}>
         Move e2 to e5
       </button>
+      <button type="button" onClick={() => onMove("e7", "e5")}>
+        Move e7 to e5
+      </button>
+      <button type="button" onClick={() => onMove("e4", "d5")}>
+        Capture e4 on d5
+      </button>
+      <button type="button" onClick={() => onMove("d4", "e3")}>
+        Move d4 to e3
+      </button>
       <button type="button" onClick={() => onMove("a7", "a8")}>
         Promote a7 to a8
       </button>
@@ -60,6 +69,9 @@ test("shows the starting position in the board and FEN input", () => {
   expect(screen.getByText("No loose pieces found.")).toBeInTheDocument();
   expect(
     screen.getByText(/not proof that the piece can be won/i),
+  ).toBeVisible();
+  expect(
+    screen.getByText("Make a move on the board to see what changed."),
   ).toBeVisible();
 });
 
@@ -121,6 +133,72 @@ test("updates the FEN after a legal board move", () => {
   expect(screen.getByLabelText("FEN")).toHaveValue(movedFen);
   expect(screen.getByTestId("board-position")).toHaveTextContent(movedFen);
   expect(screen.getByText("Black to move")).toBeInTheDocument();
+  expect(
+    screen.getByRole("region", { name: "What changed?" }),
+  ).toHaveTextContent("After e4");
+  expect(
+    screen.getByText(
+      "No tracked material, check, or loose-piece status changed.",
+    ),
+  ).toBeVisible();
+});
+
+test("replaces the previous report after the next legal move", () => {
+  render(<App />);
+
+  fireEvent.click(screen.getByRole("button", { name: "Move e2 to e4" }));
+  fireEvent.click(screen.getByRole("button", { name: "Move e7 to e5" }));
+
+  const report = screen.getByRole("region", { name: "What changed?" });
+  expect(report).toHaveTextContent("After e5");
+  expect(report).not.toHaveTextContent("After e4");
+});
+
+test("reports material changes after a capture", () => {
+  render(<App />);
+  const captureFen = "4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1";
+
+  fireEvent.change(screen.getByLabelText("FEN"), {
+    target: { value: captureFen },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Load position" }));
+  fireEvent.click(screen.getByRole("button", { name: "Capture e4 on d5" }));
+
+  expect(
+    screen.getByText("Black's pawn count changed from 1 to 0 (−1 point)."),
+  ).toBeVisible();
+  expect(
+    screen.getByText("Material balance changed from Equal to White +1."),
+  ).toBeVisible();
+});
+
+test("clears a move report after loading a valid FEN", () => {
+  render(<App />);
+
+  fireEvent.click(screen.getByRole("button", { name: "Move e2 to e4" }));
+  fireEvent.change(screen.getByLabelText("FEN"), {
+    target: { value: "4k3/8/8/8/8/8/8/4K3 w - - 0 1" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Load position" }));
+
+  expect(
+    screen.getByText("Make a move on the board to see what changed."),
+  ).toBeVisible();
+});
+
+test("keeps a move report after an invalid FEN or illegal move", () => {
+  render(<App />);
+
+  fireEvent.click(screen.getByRole("button", { name: "Move e2 to e4" }));
+  fireEvent.change(screen.getByLabelText("FEN"), {
+    target: { value: "not a fen" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Load position" }));
+  fireEvent.click(screen.getByRole("button", { name: "Move e2 to e5" }));
+
+  expect(
+    screen.getByRole("region", { name: "What changed?" }),
+  ).toHaveTextContent("After e4");
 });
 
 test("selects a finding for board highlights and clears it on position change", () => {
@@ -138,6 +216,13 @@ test("selects a finding for board highlights and clears it on position change", 
   expect(screen.getByTestId("highlighted-target")).toHaveTextContent("d4");
   expect(screen.getByTestId("highlighted-attackers")).toHaveTextContent("a4");
 
+  fireEvent.click(screen.getByRole("button", { name: "Move d4 to e3" }));
+
+  expect(screen.getByTestId("highlighted-target")).toHaveTextContent("none");
+  expect(
+    screen.getByRole("region", { name: "What changed?" }),
+  ).toHaveTextContent("After Qe3");
+
   fireEvent.change(screen.getByLabelText("FEN"), {
     target: { value: "4k3/8/8/8/8/8/8/4K3 b - - 0 1" },
   });
@@ -150,11 +235,16 @@ test("selects a finding for board highlights and clears it on position change", 
 test("keeps insights usable when analysis reports an engine error", () => {
   render(<App />);
 
+  fireEvent.click(screen.getByRole("button", { name: "Move e2 to e4" }));
+
   expect(screen.getByText("Engine unavailable")).toBeInTheDocument();
   expect(
     screen.getByRole("region", { name: "Position insights" }),
   ).toBeVisible();
   expect(screen.getByText("Equal")).toBeInTheDocument();
+  expect(
+    screen.getByRole("region", { name: "What changed?" }),
+  ).toHaveTextContent("After e4");
 });
 
 test("keeps the current FEN after an illegal board move", () => {
@@ -189,6 +279,12 @@ test("opens promotion choices and applies an underpromotion", () => {
   expect(screen.getByText("White:").parentElement).toHaveTextContent(
     "Knight 1",
   );
+  expect(
+    screen.getByRole("region", { name: "What changed?" }),
+  ).toHaveTextContent("After a8=N");
+  expect(
+    screen.getByText("White's material total changed from 1 to 3 (+2 points)."),
+  ).toBeVisible();
 });
 
 test("cancels promotion without changing the position", () => {

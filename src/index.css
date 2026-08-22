@@ -110,6 +110,7 @@ header p {
 
 .position-controls,
 .position-insights-panel,
+.position-changes-panel,
 .analysis-panel {
   padding: clamp(1.1rem, 2.5vw, 1.4rem);
   border: 1px solid var(--border);
@@ -122,12 +123,47 @@ header p {
 
 .position-controls h2,
 .position-insights-panel h2,
+.position-changes-panel h2,
 .analysis-panel h2,
 .promotion-dialog h2 {
   margin: 0 0 1rem;
   color: #f4f6f8;
   font-size: 1.2rem;
   letter-spacing: -0.015em;
+}
+
+.changes-empty,
+.changes-note {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.changes-move {
+  margin-bottom: 0.8rem;
+  color: #c8d0d8;
+}
+
+.changes-move strong {
+  color: var(--text);
+  font-size: 1.05rem;
+}
+
+.changes-list {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+  padding-left: 1.2rem;
+  color: #c8d0d8;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.changes-list li::marker {
+  color: #758797;
+}
+
+.changes-note {
+  margin-top: 0.9rem;
 }
 
 .position-status {

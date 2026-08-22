@@ -16,7 +16,7 @@ export type ParsePositionResult =
   { kind: "valid"; fen: string } | { kind: "invalid"; message: string };
 
 export type MoveAttempt =
-  | { kind: "moved"; fen: string }
+  | { kind: "moved"; fen: string; move: AppliedMove }
   | {
       kind: "promotion-required";
       from: Square;
@@ -40,6 +40,20 @@ export type InsightPiece = {
   color: InsightColor;
   type: InsightPieceType;
   square: string;
+};
+
+export type AppliedMove = {
+  color: InsightColor;
+  piece: InsightPieceType;
+  from: string;
+  to: string;
+  san: string;
+  promotion?: InsightPieceType;
+  captured?: InsightPiece;
+  castlingRook?: {
+    from: string;
+    to: string;
+  };
 };
 
 export type MaterialCounts = Record<Exclude<InsightPieceType, "king">, number>;
@@ -71,7 +85,7 @@ const pieceTypeNames: Record<PieceSymbol, InsightPieceType> = {
   k: "king",
 };
 
-const materialValues: Record<keyof MaterialCounts, number> = {
+export const MATERIAL_VALUES: Readonly<Record<keyof MaterialCounts, number>> = {
   pawn: 1,
   knight: 3,
   bishop: 3,
@@ -133,8 +147,25 @@ export function attemptMove(
       return { kind: "illegal" };
     }
 
-    chess.move({ from, to, promotion });
-    return { kind: "moved", fen: chess.fen() };
+    const captured = getCapturedPiece(chess, selectedMove);
+    const appliedMove = chess.move({ from, to, promotion });
+
+    return {
+      kind: "moved",
+      fen: chess.fen(),
+      move: {
+        color: toInsightColor(appliedMove.color),
+        piece: pieceTypeNames[appliedMove.piece],
+        from: appliedMove.from,
+        to: appliedMove.to,
+        san: appliedMove.san,
+        ...(appliedMove.promotion
+          ? { promotion: pieceTypeNames[appliedMove.promotion] }
+          : {}),
+        ...(captured ? { captured } : {}),
+        ...(getCastlingRookMove(appliedMove) ?? {}),
+      },
+    };
   } catch {
     return { kind: "illegal" };
   }
@@ -277,10 +308,50 @@ function toInsightPiece(
   square: Square,
 ): InsightPiece {
   return {
-    color: color === "w" ? "white" : "black",
+    color: toInsightColor(color),
     type: pieceTypeNames[type],
     square,
   };
+}
+
+function toInsightColor(color: Color): InsightColor {
+  return color === "w" ? "white" : "black";
+}
+
+function getCapturedPiece(
+  chess: Chess,
+  move: ReturnType<Chess["move"]>,
+): InsightPiece | undefined {
+  if (!move.captured) {
+    return undefined;
+  }
+
+  const square = move.isEnPassant()
+    ? asSquare(
+        `${move.to[0]}${Number(move.to[1]) + (move.color === "w" ? -1 : 1)}`,
+      )
+    : move.to;
+  const piece = chess.get(square);
+
+  if (!piece) {
+    throw new Error(`Missing captured piece on ${square}`);
+  }
+
+  return toInsightPiece(piece.color, piece.type, square);
+}
+
+function getCastlingRookMove(
+  move: ReturnType<Chess["move"]>,
+): Pick<AppliedMove, "castlingRook"> | undefined {
+  const rank = move.color === "w" ? "1" : "8";
+
+  if (move.isKingsideCastle()) {
+    return { castlingRook: { from: `h${rank}`, to: `f${rank}` } };
+  }
+  if (move.isQueensideCastle()) {
+    return { castlingRook: { from: `a${rank}`, to: `d${rank}` } };
+  }
+  return undefined;
 }
 
 function emptyMaterialCounts(): MaterialCounts {
@@ -288,8 +359,9 @@ function emptyMaterialCounts(): MaterialCounts {
 }
 
 function materialPoints(counts: MaterialCounts) {
-  return (Object.keys(materialValues) as Array<keyof MaterialCounts>).reduce(
-    (total, pieceType) => total + counts[pieceType] * materialValues[pieceType],
+  return (Object.keys(MATERIAL_VALUES) as Array<keyof MaterialCounts>).reduce(
+    (total, pieceType) =>
+      total + counts[pieceType] * MATERIAL_VALUES[pieceType],
     0,
   );
 }

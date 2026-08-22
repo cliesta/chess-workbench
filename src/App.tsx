@@ -4,10 +4,16 @@ import {
   attemptMove,
   getPositionInsights,
   parsePosition,
+  type AppliedMove,
   type PromotionPiece,
 } from "./chess/position";
+import {
+  comparePositionInsights,
+  type PositionChanges,
+} from "./chess/positionChanges";
 import { AnalysisPanel } from "./components/AnalysisPanel";
 import { PositionBoard } from "./components/PositionBoard";
+import { PositionChangesPanel } from "./components/PositionChangesPanel";
 import { PositionInsightsPanel } from "./components/PositionInsightsPanel";
 import { PromotionDialog } from "./components/PromotionDialog";
 
@@ -26,6 +32,8 @@ function App() {
   const [selectedInsightSquare, setSelectedInsightSquare] = useState<
     string | null
   >(null);
+  const [lastPositionChanges, setLastPositionChanges] =
+    useState<PositionChanges | null>(null);
   const insights = useMemo(
     () => getPositionInsights(positionFen),
     [positionFen],
@@ -34,11 +42,17 @@ function App() {
     ({ piece }) => piece.square === selectedInsightSquare,
   );
 
-  function commitPosition(fen: string) {
+  function commitPosition(fen: string, changes: PositionChanges | null) {
     setPositionFen(fen);
     setFenDraft(fen);
     setFenError(null);
     setSelectedInsightSquare(null);
+    setLastPositionChanges(changes);
+  }
+
+  function commitMove(fen: string, move: AppliedMove) {
+    const nextInsights = getPositionInsights(fen);
+    commitPosition(fen, comparePositionInsights(insights, nextInsights, move));
   }
 
   function handleFenSubmit(event: FormEvent<HTMLFormElement>) {
@@ -50,7 +64,7 @@ function App() {
       return;
     }
 
-    commitPosition(result.fen);
+    commitPosition(result.fen, null);
     setPendingPromotion(null);
   }
 
@@ -58,7 +72,7 @@ function App() {
     const result = attemptMove(positionFen, from, to);
 
     if (result.kind === "moved") {
-      commitPosition(result.fen);
+      commitMove(result.fen, result.move);
       return true;
     }
 
@@ -86,7 +100,7 @@ function App() {
     );
 
     if (result.kind === "moved") {
-      commitPosition(result.fen);
+      commitMove(result.fen, result.move);
     }
 
     setPendingPromotion(null);
@@ -143,6 +157,8 @@ function App() {
             selectedSquare={selectedInsightSquare}
             onSelectSquare={setSelectedInsightSquare}
           />
+
+          <PositionChangesPanel changes={lastPositionChanges} />
 
           <AnalysisPanel fen={positionFen} />
         </div>

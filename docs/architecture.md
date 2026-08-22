@@ -52,6 +52,32 @@ clears the selection, while an invalid FEN draft leaves both the canonical
 position and its insights unchanged. This flow remains independent of the
 asynchronous engine lifecycle.
 
+## Latest-move comparison
+
+Successful `attemptMove` results also carry plain `AppliedMove` metadata: SAN,
+the moving piece and squares, promotion, the actual captured piece square, and
+the castling rook movement when applicable. `src/chess/position.ts` derives
+those facts from `chess.js`; React does not infer special moves from board
+coordinates or receive library-specific move objects.
+
+`src/chess/positionChanges.ts` is a pure TypeScript comparison module. Given the
+insight snapshots immediately before and after a completed move, plus its move
+metadata, it reports material-count and balance changes, colour-specific check
+transitions, and surviving pieces that entered or left the existing
+attacked-and-undefended set. It maps moved pieces, promotions, and castling
+rooks across squares and removes captured pieces at their actual square, so a
+capture is never misreported as a piece merely becoming safe. It deliberately
+inherits the static pinned-piece semantics of the underlying insight snapshots.
+
+`App` stores only the latest `PositionChanges` report as one-step historical
+presentation state. This does not compete with `positionFen`, which remains the
+sole current-position authority. A completed board move replaces the report; a
+valid direct FEN load clears it because arbitrary FENs do not establish a
+one-move history. Invalid drafts, illegal drops, and cancelled promotions leave
+it unchanged. `PositionChangesPanel` renders the SAN and factual transitions
+without move grading or engine-score comparison. Stockfish independently starts
+analysing the new canonical FEN as before.
+
 ## Engine analysis
 
 `AnalysisPanel` receives the canonical `positionFen`. The

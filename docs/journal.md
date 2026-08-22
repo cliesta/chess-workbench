@@ -201,3 +201,33 @@ material sign and promotion cases, both-colour loose-piece detection, pinned
 attackers and defenders, stable ordering, accessible panel behavior, board-style
 adaptation, and application flows. Tactical motif detection and “what changed?”
 comparison remain explicitly outside this milestone.
+
+---
+
+# 2026-08-22 — Milestone 5: What changed after the move?
+
+Chess Workbench now compares the position immediately before and after each
+completed board move. A new “What changed?” panel shows the move in SAN and
+reports factual material-count and balance changes, colours entering or leaving
+check, and pieces crossing the existing attacked-and-undefended boundary. Quiet
+moves get an explicit neutral result rather than an empty panel.
+
+The report is deliberately one-step history. Each legal move replaces it, while
+a valid direct FEN load clears it because two arbitrary FENs do not establish a
+known move. Invalid FEN drafts, illegal drops, and cancelled promotions leave it
+alone. Promotion produces one report only after the choice is completed.
+
+The chess boundary now returns application-friendly SAN and move metadata for
+captures, en passant, promotions, and castling. A pure TypeScript comparison
+module uses that data to follow moved pieces and the castling rook, and to omit
+captured pieces at their actual square. This prevents misleading output such as
+calling a captured loose piece “no longer attacked.” The canonical FEN remains
+the only current-position authority; the report is historical presentation
+state and remains independent of Stockfish.
+
+No dependency was added. The verification gate passes with 105 tests covering
+both material perspectives, check-with-check, promotion totals, loose-piece
+transitions, moved and captured identity, en passant, castling, pinned-attacker
+semantics, accessible explanatory wording, and application lifecycle behavior.
+Engine-score comparison, move grading, tactical motifs, move history, and PGN
+work remain outside the milestone.

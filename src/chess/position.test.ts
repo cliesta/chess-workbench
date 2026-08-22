@@ -41,6 +41,13 @@ describe("attemptMove", () => {
     expect(attemptMove(STARTING_FEN, "e2", "e4")).toEqual({
       kind: "moved",
       fen: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+      move: {
+        color: "white",
+        piece: "pawn",
+        from: "e2",
+        to: "e4",
+        san: "e4",
+      },
     });
   });
 
@@ -59,6 +66,27 @@ describe("attemptMove", () => {
     ).toEqual({
       kind: "moved",
       fen: "r3k2r/8/8/8/8/8/8/R4RK1 b kq - 1 1",
+      move: {
+        color: "white",
+        piece: "king",
+        from: "e1",
+        to: "g1",
+        san: "O-O",
+        castlingRook: { from: "h1", to: "f1" },
+      },
+    });
+  });
+
+  test("records the rook movement for queenside castling", () => {
+    expect(
+      attemptMove("r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1", "e8", "c8"),
+    ).toMatchObject({
+      kind: "moved",
+      move: {
+        color: "black",
+        san: "O-O-O",
+        castlingRook: { from: "a8", to: "d8" },
+      },
     });
   });
 
@@ -68,6 +96,26 @@ describe("attemptMove", () => {
     ).toEqual({
       kind: "moved",
       fen: "4k3/8/3P4/8/8/8/8/4K3 b - - 0 1",
+      move: {
+        color: "white",
+        piece: "pawn",
+        from: "e5",
+        to: "d6",
+        san: "exd6",
+        captured: { color: "black", type: "pawn", square: "d5" },
+      },
+    });
+  });
+
+  test("records an ordinary capture and its destination square", () => {
+    expect(
+      attemptMove("4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1", "e4", "d5"),
+    ).toMatchObject({
+      kind: "moved",
+      move: {
+        san: "exd5",
+        captured: { color: "black", type: "pawn", square: "d5" },
+      },
     });
   });
 
@@ -84,9 +132,20 @@ describe("attemptMove", () => {
     ["q", "Q3k3/8/8/8/8/8/8/4K3 b - - 0 1"],
     ["n", "N3k3/8/8/8/8/8/8/4K3 b - - 0 1"],
   ] as const)("completes promotion to %s", (piece, expectedFen) => {
+    const promotionType = piece === "q" ? "queen" : "knight";
     expect(
       attemptMove("4k3/P7/8/8/8/8/8/4K3 w - - 0 1", "a7", "a8", piece),
-    ).toEqual({ kind: "moved", fen: expectedFen });
+    ).toMatchObject({
+      kind: "moved",
+      fen: expectedFen,
+      move: {
+        color: "white",
+        piece: "pawn",
+        from: "a7",
+        to: "a8",
+        promotion: promotionType,
+      },
+    });
   });
 
   test("detects and completes a black promotion", () => {
@@ -99,7 +158,21 @@ describe("attemptMove", () => {
     expect(attemptMove(fen, "a2", "a1", "r")).toEqual({
       kind: "moved",
       fen: "4k3/8/8/8/8/8/8/r3K3 w - - 0 2",
+      move: {
+        color: "black",
+        piece: "pawn",
+        from: "a2",
+        to: "a1",
+        san: "a1=R+",
+        promotion: "rook",
+      },
     });
+  });
+
+  test("preserves a checkmate suffix in SAN", () => {
+    expect(
+      attemptMove("7k/8/5KQ1/8/8/8/8/8 w - - 0 1", "g6", "g7"),
+    ).toMatchObject({ kind: "moved", move: { san: "Qg7#" } });
   });
 });
 
