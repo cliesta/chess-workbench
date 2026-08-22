@@ -3,6 +3,7 @@ import type { ComponentProps } from "react";
 import { expect, test, vi } from "vitest";
 import type { ImportedGame } from "../chess/game";
 import { STARTING_FEN } from "../chess/position";
+import type { GameAnalysisState } from "../engine/types";
 import { GameReviewPanel } from "./GameReviewPanel";
 
 const game: ImportedGame = {
@@ -41,6 +42,16 @@ const game: ImportedGame = {
   ],
 };
 
+const idleGameAnalysis: GameAnalysisState = {
+  status: "idle",
+  results: [null, null, null],
+  completedCount: 0,
+  totalCount: 3,
+  activePositionIndex: null,
+  activeResult: null,
+  errorMessage: null,
+};
+
 function renderPanel(
   overrides: Partial<ComponentProps<typeof GameReviewPanel>> = {},
 ) {
@@ -49,9 +60,13 @@ function renderPanel(
     error: null,
     game: null,
     positionIndex: null,
+    gameAnalysis: { ...idleGameAnalysis, results: [], totalCount: 0 },
+    canAnalyseGame: false,
     onDraftChange: vi.fn(),
     onLoad: vi.fn(),
     onNavigate: vi.fn(),
+    onStartAnalysis: vi.fn(),
+    onCancelAnalysis: vi.fn(),
     ...overrides,
   };
   render(<GameReviewPanel {...props} />);
@@ -82,7 +97,12 @@ test("associates and announces a PGN error", () => {
 });
 
 test("renders metadata, move status, current step, and navigation callbacks", () => {
-  const props = renderPanel({ game, positionIndex: 1 });
+  const props = renderPanel({
+    game,
+    positionIndex: 1,
+    gameAnalysis: idleGameAnalysis,
+    canAnalyseGame: true,
+  });
 
   expect(screen.getByText("Jane Player vs Alex Opponent")).toBeVisible();
   expect(
@@ -118,6 +138,7 @@ test("shows start and zero-move boundary states with missing headers", () => {
   renderPanel({
     game: { headers: {}, positions: [{ fen: STARTING_FEN }] },
     positionIndex: 0,
+    gameAnalysis: { ...idleGameAnalysis, results: [null], totalCount: 1 },
   });
 
   expect(screen.getByText("Unknown players")).toBeVisible();
@@ -150,10 +171,136 @@ test("numbers a custom game beginning with Black using ellipsis notation", () =>
       ],
     },
     positionIndex: 1,
+    gameAnalysis: { ...idleGameAnalysis, results: [null, null], totalCount: 2 },
   });
 
   expect(screen.getByText("After 17... Kd7")).toBeVisible();
   expect(
     screen.getByRole("button", { name: "Go to after 17... Kd7" }),
   ).toHaveAttribute("aria-current", "step");
+});
+
+test("starts a quick game pass only when the engine is available", () => {
+  const props = renderPanel({
+    game,
+    positionIndex: 0,
+    gameAnalysis: idleGameAnalysis,
+    canAnalyseGame: true,
+  });
+
+  expect(
+    screen.getByText("Quick engine pass · 500 ms per position"),
+  ).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Analyse game" }));
+  expect(props.onStartAnalysis).toHaveBeenCalledOnce();
+});
+
+test("shows accessible progress and cancellation while running", () => {
+  const props = renderPanel({
+    game,
+    positionIndex: 1,
+    gameAnalysis: {
+      ...idleGameAnalysis,
+      status: "running",
+      completedCount: 1,
+      activePositionIndex: 1,
+    },
+    canAnalyseGame: false,
+  });
+
+  expect(screen.getByText("Analysing game: 1 of 3 positions")).toBeVisible();
+  expect(
+    screen.getByRole("progressbar", { name: "Game analysis progress" }),
+  ).toHaveValue(1);
+  fireEvent.click(screen.getByRole("button", { name: "Cancel analysis" }));
+  expect(props.onCancelAnalysis).toHaveBeenCalledOnce();
+  expect(screen.getByRole("button", { name: "Next" })).toBeEnabled();
+});
+
+test("maps retained evaluations to the start and correct move", () => {
+  renderPanel({
+    game,
+    positionIndex: 1,
+    gameAnalysis: {
+      ...idleGameAnalysis,
+      status: "complete",
+      completedCount: 3,
+      results: [
+        {
+          fen: STARTING_FEN,
+          depth: 12,
+          evaluation: { kind: "centipawns", whiteCentipawns: 22 },
+          principalVariation: "1. e4",
+          principalVariationUsesRawNotation: false,
+        },
+        {
+          fen: "after-e4",
+          depth: 11,
+          evaluation: { kind: "centipawns", whiteCentipawns: -120 },
+          principalVariation: "1... e5",
+          principalVariationUsesRawNotation: false,
+        },
+        {
+          fen: "wrong-fen",
+          depth: 10,
+          evaluation: { kind: "mate", whiteMateIn: 3 },
+          principalVariation: null,
+          principalVariationUsesRawNotation: false,
+        },
+      ],
+    },
+    canAnalyseGame: true,
+  });
+
+  expect(
+    screen.getByText("Starting evaluation:").parentElement,
+  ).toHaveTextContent("+0.22");
+  expect(
+    screen.getByRole("button", {
+      name: "Go to after 1. e4, evaluation −1.20",
+    }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole("button", { name: "Go to after 1... e5" }),
+  ).not.toHaveTextContent("+M3");
+  expect(screen.getByText("Analysis complete: 3 positions.")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Analyse again" })).toBeEnabled();
+});
+
+test("uses calm cancellation wording and permits a fresh run", () => {
+  renderPanel({
+    game,
+    positionIndex: 0,
+    gameAnalysis: {
+      ...idleGameAnalysis,
+      status: "cancelled",
+      completedCount: 1,
+    },
+    canAnalyseGame: true,
+  });
+
+  expect(
+    screen.getByText("Analysis cancelled: 1 of 3 positions retained."),
+  ).toBeVisible();
+  expect(screen.getByRole("button", { name: "Analyse again" })).toBeEnabled();
+});
+
+test("reports a terminal engine error without offering a known-broken retry", () => {
+  renderPanel({
+    game,
+    positionIndex: 0,
+    gameAnalysis: {
+      ...idleGameAnalysis,
+      status: "error",
+      errorMessage: "Worker failed",
+    },
+    canAnalyseGame: false,
+  });
+
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Game analysis stopped. Worker failed",
+  );
+  expect(
+    screen.queryByRole("button", { name: "Analyse again" }),
+  ).not.toBeInTheDocument();
 });

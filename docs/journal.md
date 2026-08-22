@@ -266,3 +266,42 @@ linting, type checking, and a production build. Local production inspection
 confirmed that the built HTML and versioned Stockfish Worker/Wasm assets are
 present, byte-identical to the generated public assets, and that the Wasm is
 served as `application/wasm`.
+
+---
+
+# 2026-08-22 — Milestone 7: Whole-game analysis
+
+Imported games can now be analysed from their initial position through every
+main-line ply. The user explicitly starts a quick engine pass, sees accessible
+progress, may navigate freely while it runs, and can cancel without losing
+completed results. The initial evaluation is shown separately and each completed
+after-position evaluation appears as restrained secondary text beside its SAN
+move.
+
+One workbench-level hook now owns the single Stockfish Worker. Ordinary selected-
+position searches retain their 1,500-millisecond limit; a game run temporarily
+supersedes them and submits positions sequentially at 500 milliseconds each.
+The detailed Analysis panel becomes presentation-only and shows a matching live,
+retained, or waiting state during the pass. Normal selected-position analysis
+resumes after completion or cancellation, so two CPU-heavy engines never compete.
+
+Batch results remain ephemeral engine state rather than becoming part of the
+immutable imported-game model. Index alignment plus repeated FEN, request ID,
+game identity, and run-generation checks prevent stale output from crossing
+positions or replacement games. Valid game replacement or exit to standalone
+analysis stops and discards the run; invalid input, illegal moves, navigation,
+and cancelled promotion preserve it. Terminal Worker failure retains completed
+partial results and leaves PGN navigation and deterministic panels usable.
+
+This milestone deliberately reports only depth, White-perspective evaluation,
+and one SAN PV. It does not calculate evaluation loss, grade moves, choose review
+moments, draw a graph, or explain mistakes. Those interpretations remain the
+next product step.
+
+The complete verification gate passes under Node 24 with 149 tests, formatting,
+linting, type checking, and a production build. A real production-preview browser
+run used the deployed Stockfish Worker to analyse a four-position game
+sequentially, display all retained evaluations, navigate to a pending position,
+cancel a rerun with partial results intact, and resume the selected-position
+search. The 390-pixel layout had no horizontal overflow, the versioned Worker was
+the only engine loader observed, and the console had no warnings or errors.

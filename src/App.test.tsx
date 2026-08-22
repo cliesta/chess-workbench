@@ -1,7 +1,12 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { expect, test, vi } from "vitest";
+import { beforeEach, expect, test, vi } from "vitest";
 import { STARTING_FEN } from "./chess/position";
 import App from "./App";
+
+const analysisMocks = vi.hoisted(() => ({
+  startGameAnalysis: vi.fn(),
+  cancelGameAnalysis: vi.fn(),
+}));
 
 vi.mock("./components/PositionBoard", () => ({
   PositionBoard: ({
@@ -49,13 +54,52 @@ vi.mock("./components/PositionBoard", () => ({
 }));
 
 vi.mock("./components/AnalysisPanel", () => ({
-  AnalysisPanel: ({ fen }: { fen: string }) => (
+  AnalysisPanel: ({
+    analysis,
+  }: {
+    analysis: { principalVariation: string | null };
+  }) => (
     <section aria-label="Analysis">
       <p>Engine unavailable</p>
-      <span data-testid="analysis-position">{fen}</span>
+      <span data-testid="analysis-position">{analysis.principalVariation}</span>
     </section>
   ),
 }));
+
+vi.mock("./engine/useWorkbenchAnalysis", () => ({
+  useWorkbenchAnalysis: ({
+    fen,
+    game,
+  }: {
+    fen: string;
+    game: { positions: unknown[] } | null;
+  }) => ({
+    positionAnalysis: {
+      status: "error",
+      depth: null,
+      evaluation: null,
+      principalVariation: fen,
+      principalVariationUsesRawNotation: false,
+      errorMessage: "Engine unavailable",
+    },
+    gameAnalysis: {
+      status: "idle",
+      results: game?.positions.map(() => null) ?? [],
+      completedCount: 0,
+      totalCount: game?.positions.length ?? 0,
+      activePositionIndex: null,
+      activeResult: null,
+      errorMessage: null,
+    },
+    canAnalyseGame: game !== null,
+    startGameAnalysis: analysisMocks.startGameAnalysis,
+    cancelGameAnalysis: analysisMocks.cancelGameAnalysis,
+  }),
+}));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 const shortGame = `
 [White "Jane Player"]
@@ -359,6 +403,18 @@ test("loads a PGN at its initial position and navigates every position consumer 
   expect(
     screen.getByRole("region", { name: "What changed?" }),
   ).toHaveTextContent("After e4");
+});
+
+test("offers explicit whole-game analysis only for a loaded game", () => {
+  render(<App />);
+
+  expect(
+    screen.queryByRole("button", { name: "Analyse game" }),
+  ).not.toBeInTheDocument();
+  loadGame();
+  fireEvent.click(screen.getByRole("button", { name: "Analyse game" }));
+
+  expect(analysisMocks.startGameAnalysis).toHaveBeenCalledOnce();
 });
 
 test("supports jumping and keeps the producing-move report when navigating backward", () => {

@@ -1,25 +1,21 @@
 import { formatEvaluation } from "../engine/formatEvaluation";
 import { STOCKFISH_SOURCE_URL } from "../engine/stockfishAssets";
-import {
-  usePositionAnalysis,
-  type PositionAnalysisEngineFactory,
-} from "../engine/usePositionAnalysis";
+import type { PositionAnalysisState } from "../engine/types";
 
 type AnalysisPanelProps = {
-  fen: string;
-  createEngine?: PositionAnalysisEngineFactory;
+  analysis: PositionAnalysisState;
 };
 
 const statusLabels = {
-  loading: "Loading",
+  loading: "Loading engine",
   ready: "Ready",
-  analysing: "Analysing",
+  "analysing-position": "Analysing position",
+  "analysing-game": "Analysing game",
+  "waiting-for-game": "Waiting for game analysis",
   error: "Error",
 } as const;
 
-export function AnalysisPanel({ fen, createEngine }: AnalysisPanelProps) {
-  const analysis = usePositionAnalysis(fen, createEngine);
-
+export function AnalysisPanel({ analysis }: AnalysisPanelProps) {
   return (
     <section className="analysis-panel" aria-labelledby="analysis-title">
       <h2 id="analysis-title">Analysis</h2>

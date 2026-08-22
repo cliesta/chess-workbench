@@ -1,15 +1,24 @@
 import type { FormEvent } from "react";
 import type { ImportedGame } from "../chess/game";
 import type { ImportedGamePosition } from "../chess/game";
+import { formatEvaluation } from "../engine/formatEvaluation";
+import {
+  GAME_POSITION_MOVE_TIME_MS,
+  type GameAnalysisState,
+} from "../engine/types";
 
 type GameReviewPanelProps = {
   pgnDraft: string;
   error: string | null;
   game: ImportedGame | null;
   positionIndex: number | null;
+  gameAnalysis: GameAnalysisState;
+  canAnalyseGame: boolean;
   onDraftChange: (pgn: string) => void;
   onLoad: () => void;
   onNavigate: (positionIndex: number) => void;
+  onStartAnalysis: () => void;
+  onCancelAnalysis: () => void;
 };
 
 export function GameReviewPanel({
@@ -17,9 +26,13 @@ export function GameReviewPanel({
   error,
   game,
   positionIndex,
+  gameAnalysis,
+  canAnalyseGame,
   onDraftChange,
   onLoad,
   onNavigate,
+  onStartAnalysis,
+  onCancelAnalysis,
 }: GameReviewPanelProps) {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -59,6 +72,13 @@ export function GameReviewPanel({
       {game && positionIndex !== null && (
         <div className="game-navigation">
           <div className="game-summary">{formatGameSummary(game)}</div>
+          <GameAnalysisControls
+            analysis={gameAnalysis}
+            canAnalyse={canAnalyseGame}
+            initialFen={game.positions[0].fen}
+            onStart={onStartAnalysis}
+            onCancel={onCancelAnalysis}
+          />
           <p className="game-position-status" aria-live="polite">
             <strong>
               {positionIndex === 0
@@ -114,9 +134,19 @@ export function GameReviewPanel({
                         : `${row.moveNumber}...`}
                     </span>
                     {row.white &&
-                      renderMoveButton(row.white, positionIndex, onNavigate)}
+                      renderMoveButton(
+                        row.white,
+                        positionIndex,
+                        gameAnalysis,
+                        onNavigate,
+                      )}
                     {row.black &&
-                      renderMoveButton(row.black, positionIndex, onNavigate)}
+                      renderMoveButton(
+                        row.black,
+                        positionIndex,
+                        gameAnalysis,
+                        onNavigate,
+                      )}
                   </li>
                 );
               })}
@@ -174,21 +204,112 @@ function groupMoves(game: ImportedGame): MoveRow[] {
 function renderMoveButton(
   indexedMove: IndexedMove,
   currentPositionIndex: number,
+  gameAnalysis: GameAnalysisState,
   onNavigate: (positionIndex: number) => void,
 ) {
   const { position, positionIndex } = indexedMove;
   const label = formatMoveLabel(position);
+  const result = gameAnalysis.results[positionIndex];
+  const evaluation =
+    result?.fen === position.fen ? formatEvaluation(result.evaluation) : null;
+  const accessibleEvaluation = evaluation ? `, evaluation ${evaluation}` : "";
 
   return (
     <button
       type="button"
       className={`move-button move-${position.move?.color}`}
-      aria-label={`Go to after ${label}`}
+      aria-label={`Go to after ${label}${accessibleEvaluation}`}
       aria-current={positionIndex === currentPositionIndex ? "step" : undefined}
       onClick={() => onNavigate(positionIndex)}
     >
-      {position.move?.san}
+      <span>{position.move?.san}</span>
+      {evaluation && <span className="move-evaluation">{evaluation}</span>}
     </button>
+  );
+}
+
+type GameAnalysisControlsProps = {
+  analysis: GameAnalysisState;
+  canAnalyse: boolean;
+  initialFen: string;
+  onStart: () => void;
+  onCancel: () => void;
+};
+
+function GameAnalysisControls({
+  analysis,
+  canAnalyse,
+  initialFen,
+  onStart,
+  onCancel,
+}: GameAnalysisControlsProps) {
+  const initialResult = analysis.results[0];
+  const initialEvaluation =
+    initialResult?.fen === initialFen
+      ? formatEvaluation(initialResult.evaluation)
+      : null;
+
+  return (
+    <div
+      className="game-analysis-controls"
+      aria-labelledby="game-analysis-title"
+    >
+      <h3 id="game-analysis-title">Game analysis</h3>
+      <p className="game-analysis-note">
+        Quick engine pass · {GAME_POSITION_MOVE_TIME_MS} ms per position
+      </p>
+
+      {analysis.status === "running" ? (
+        <>
+          <p className="game-analysis-progress" aria-live="polite">
+            Analysing game: {analysis.completedCount} of {analysis.totalCount}{" "}
+            positions
+          </p>
+          <progress
+            aria-label="Game analysis progress"
+            max={analysis.totalCount}
+            value={analysis.completedCount}
+          />
+          <button type="button" className="secondary-button" onClick={onCancel}>
+            Cancel analysis
+          </button>
+        </>
+      ) : (
+        <>
+          {analysis.status === "complete" && (
+            <p>Analysis complete: {analysis.completedCount} positions.</p>
+          )}
+          {analysis.status === "cancelled" && (
+            <p>
+              Analysis cancelled: {analysis.completedCount} of{" "}
+              {analysis.totalCount} positions retained.
+            </p>
+          )}
+          {analysis.status === "error" && (
+            <p className="error-message" role="alert">
+              Game analysis stopped.{" "}
+              {analysis.errorMessage ?? "Engine unavailable."}
+            </p>
+          )}
+          {analysis.status !== "error" && (
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={!canAnalyse}
+              onClick={onStart}
+            >
+              {analysis.status === "idle" ? "Analyse game" : "Analyse again"}
+            </button>
+          )}
+        </>
+      )}
+
+      {initialEvaluation && (
+        <p className="starting-evaluation">
+          Starting evaluation: <strong>{initialEvaluation}</strong>
+        </p>
+      )}
+    </div>
   );
 }
 

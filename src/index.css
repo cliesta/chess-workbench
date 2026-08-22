@@ -403,6 +403,43 @@ button:disabled {
   border-top: 1px solid var(--border);
 }
 
+.game-analysis-controls {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: rgb(5 9 13 / 20%);
+}
+
+.game-analysis-controls h3 {
+  margin: 0;
+  color: #dbe2e8;
+  font-size: 0.98rem;
+}
+
+.game-analysis-controls p {
+  margin: 0;
+  color: #c8d0d8;
+  font-size: 0.88rem;
+}
+
+.game-analysis-controls .game-analysis-note,
+.game-analysis-controls .starting-evaluation {
+  color: var(--text-muted);
+}
+
+.game-analysis-controls .starting-evaluation strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.game-analysis-controls progress {
+  width: 100%;
+  height: 0.55rem;
+  accent-color: var(--accent);
+}
+
 .game-summary {
   display: grid;
   gap: 0.2rem;
@@ -465,6 +502,10 @@ button:disabled {
 }
 
 .move-button {
+  display: flex;
+  gap: 0.35rem;
+  align-items: baseline;
+  justify-content: space-between;
   width: 100%;
   padding: 0.45rem 0.58rem;
   border-color: transparent;
@@ -473,6 +514,13 @@ button:disabled {
   font-size: 0.86rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+.move-evaluation {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 550;
 }
 
 .move-black {

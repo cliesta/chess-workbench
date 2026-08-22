@@ -41,7 +41,12 @@ responsibility. Selecting a ply updates the workspace index and synchronizes
 the FEN draft. A valid direct FEN load or completed legal board move explicitly
 returns to standalone mode; invalid input, illegal moves, and cancelled
 promotions leave game review intact. Stockfish continues to analyse only the
-single derived current FEN, using its existing stale-result protection.
+single derived current FEN unless the user starts the explicit whole-game pass.
+
+Whole-game engine output is ephemeral state separate from `ImportedGame`. Its
+result array aligns with the game's position indices and repeats each FEN as a
+defensive identity check. This keeps parsed chess facts immutable and prevents
+engine results from becoming another authority for the board position.
 
 `src/chess/position.ts` also converts engine principal variations from UCI
 coordinate moves to numbered SAN by replaying them from the analysed FEN. This
@@ -100,11 +105,29 @@ independently starts analysing the newly derived current FEN as before.
 
 ## Engine analysis
 
-`AnalysisPanel` receives the canonical `positionFen`. The
-`usePositionAnalysis` hook owns the browser lifecycle: it initializes one engine
-client, starts a fixed 1,500-millisecond search when the canonical FEN changes,
-filters typed updates by both request identifier and FEN, and cleans up on
-unmount. Draft or invalid FEN text never reaches the engine.
+`App` calls `useWorkbenchAnalysis` once with the derived current FEN, imported
+game, and selected game index. The hook owns exactly one browser engine client.
+When no game-analysis job is running, it starts the established fixed
+1,500-millisecond search whenever the selected FEN changes. `AnalysisPanel` is a
+presentation-only consumer of its typed state. Draft or invalid FEN text never
+reaches the engine.
+
+An explicit whole-game pass temporarily owns that same Worker. The hook
+supersedes the interactive search, submits the imported initial position and
+every after-position sequentially at 500 milliseconds each, and retains the
+latest depth, White-perspective evaluation, and SAN PV for completed positions.
+Navigation does not interrupt the queue. The selected Analysis panel shows only
+a matching live, retained, or waiting state; it never starts a competing search.
+When the pass completes or is cancelled, normal analysis resumes for the
+currently selected FEN.
+
+Each game run has a generation identifier in addition to the engine request ID,
+FEN, game object, and position index checks. Replacing the game or leaving game
+review invalidates that generation, stops active work, and discards its results.
+Cancellation preserves completed entries but submits no later positions. Late
+promises may settle, but their callbacks cannot write into a replacement run.
+Worker/protocol failure remains terminal for the engine client; partial game
+results and the complete chess interface remain usable without recovery logic.
 
 `StockfishAnalysisClient` is the boundary around the Worker and the UCI text
 protocol. It initializes Stockfish with `uci` and `isready`, serializes searches
@@ -117,7 +140,9 @@ an error; the position editor remains independent and usable.
 
 UCI centipawn and mate scores are normalized to White's perspective before they
 cross the boundary: positive always favours White. Principal variations are SAN
-strings rather than raw engine coordinates.
+strings rather than raw engine coordinates. Retained move-list evaluations are
+factual engine output only; no adjacent-score delta, move-quality label, graph,
+or review-moment ranking is calculated.
 
 The pinned `stockfish` npm package supplies the lite single-thread JavaScript and
 Wasm pair. A small pre-development/pre-build script copies only those files,

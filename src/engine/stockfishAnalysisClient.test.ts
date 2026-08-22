@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { STARTING_FEN } from "../chess/position";
-import { ANALYSIS_MOVE_TIME_MS, type AnalysisRequest } from "./types";
+import {
+  CURRENT_POSITION_MOVE_TIME_MS,
+  GAME_POSITION_MOVE_TIME_MS,
+  type AnalysisRequest,
+} from "./types";
 import {
   StockfishAnalysisClient,
   type StockfishWorker,
@@ -64,6 +68,34 @@ describe("StockfishAnalysisClient", () => {
 
     worker.emit("bestmove e2e4");
     await expect(completed).resolves.toBe("complete");
+  });
+
+  test("uses the requested game-analysis time limit", async () => {
+    const { client, worker } = await initializedClient();
+    const completed = client.analyse(
+      {
+        requestId: 1,
+        fen: STARTING_FEN,
+        moveTimeMs: GAME_POSITION_MOVE_TIME_MS,
+      },
+      vi.fn(),
+    );
+
+    expect(worker.messages.at(-1)).toBe("go movetime 500");
+    worker.emit("bestmove e2e4");
+    await expect(completed).resolves.toBe("complete");
+  });
+
+  test("rejects a non-positive time limit without starting a search", async () => {
+    const { client, worker } = await initializedClient();
+
+    await expect(
+      client.analyse(
+        { requestId: 1, fen: STARTING_FEN, moveTimeMs: 0 },
+        vi.fn(),
+      ),
+    ).rejects.toThrow(/must be positive/i);
+    expect(worker.messages).not.toContain("go movetime 0");
   });
 
   test("serializes a replacement search and keeps late output assigned to the old request", async () => {
@@ -171,7 +203,7 @@ function request(requestId: number, fen: string): AnalysisRequest {
   return {
     requestId,
     fen,
-    moveTimeMs: ANALYSIS_MOVE_TIME_MS,
+    moveTimeMs: CURRENT_POSITION_MOVE_TIME_MS,
   };
 }
 

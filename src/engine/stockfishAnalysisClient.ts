@@ -116,6 +116,10 @@ export class StockfishAnalysisClient implements PositionAnalysisEngine {
     request: AnalysisRequest,
     onUpdate: (update: AnalysisUpdate) => void,
   ): Promise<AnalysisCompletion> {
+    if (!Number.isFinite(request.moveTimeMs) || request.moveTimeMs <= 0) {
+      return Promise.reject(new Error("Analysis move time must be positive."));
+    }
+
     if (this.state !== "ready" && this.state !== "searching") {
       return Promise.reject(
         this.failure ?? new Error("Stockfish is not ready to analyse."),

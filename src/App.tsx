@@ -18,6 +18,10 @@ import { PositionBoard } from "./components/PositionBoard";
 import { PositionChangesPanel } from "./components/PositionChangesPanel";
 import { PositionInsightsPanel } from "./components/PositionInsightsPanel";
 import { PromotionDialog } from "./components/PromotionDialog";
+import {
+  useWorkbenchAnalysis,
+  type PositionAnalysisEngineFactory,
+} from "./engine/useWorkbenchAnalysis";
 
 type PendingPromotion = {
   from: string;
@@ -37,7 +41,11 @@ type Workspace =
       positionIndex: number;
     };
 
-function App() {
+type AppProps = {
+  createEngine?: PositionAnalysisEngineFactory;
+};
+
+function App({ createEngine }: AppProps = {}) {
   const [workspace, setWorkspace] = useState<Workspace>({
     kind: "position",
     fen: STARTING_FEN,
@@ -60,6 +68,15 @@ function App() {
     workspace.kind === "position"
       ? workspace.changes
       : (workspace.game.positions[workspace.positionIndex].changes ?? null);
+  const currentGame = workspace.kind === "game" ? workspace.game : null;
+  const currentGamePositionIndex =
+    workspace.kind === "game" ? workspace.positionIndex : null;
+  const analysis = useWorkbenchAnalysis({
+    fen: positionFen,
+    game: currentGame,
+    positionIndex: currentGamePositionIndex,
+    ...(createEngine ? { createEngine } : {}),
+  });
   const insights = useMemo(
     () => getPositionInsights(positionFen),
     [positionFen],
@@ -188,13 +205,15 @@ function App() {
           <GameReviewPanel
             pgnDraft={pgnDraft}
             error={pgnError}
-            game={workspace.kind === "game" ? workspace.game : null}
-            positionIndex={
-              workspace.kind === "game" ? workspace.positionIndex : null
-            }
+            game={currentGame}
+            positionIndex={currentGamePositionIndex}
+            gameAnalysis={analysis.gameAnalysis}
+            canAnalyseGame={analysis.canAnalyseGame}
             onDraftChange={setPgnDraft}
             onLoad={handleGameLoad}
             onNavigate={handleGameNavigation}
+            onStartAnalysis={analysis.startGameAnalysis}
+            onCancelAnalysis={analysis.cancelGameAnalysis}
           />
 
           <section
@@ -232,7 +251,7 @@ function App() {
 
           <PositionChangesPanel changes={lastPositionChanges} />
 
-          <AnalysisPanel fen={positionFen} />
+          <AnalysisPanel analysis={analysis.positionAnalysis} />
         </div>
       </div>
 
