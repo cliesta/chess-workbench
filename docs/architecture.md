@@ -62,13 +62,19 @@ SharedArrayBuffer and cross-origin-isolation requirements.
 
 ## Production delivery
 
-The production application is a static Vite build in `dist/`; it has no runtime
-server, backend, environment variables, or secrets. The repository is prepared
-for one approved production topology: GitHub becomes the canonical repository,
-and Cloudflare Pages becomes the single production host serving the application
-from `/`. A small GitHub Actions workflow runs `npm ci` and `npm run verify` on
-every push. Once the external connection is configured, Cloudflare independently
-builds pushes to `main` with `npm run build` and publishes `dist/`.
+The production application is the static Vite build in `dist/`; it has no
+application server, backend, environment variables, or secrets. GitHub is the
+canonical repository. Cloudflare Workers Builds independently builds pushes to
+`main` and publishes the static assets at
+`https://chess-workbench.cliesta.workers.dev/`. The Cloudflare Worker is only the
+hosting container for static assets: the repository contains no server-side
+Worker code or functions. This is separate from the browser Web Worker that runs
+Stockfish on the user's device.
+
+A small GitHub Actions workflow runs `npm ci` and `npm run verify` on every push.
+The first production commit passed that workflow, and the deployed HTML,
+JavaScript, CSS, Stockfish loader, Wasm, and licence were verified against its
+local production build.
 
 `public/_headers` defines the browser cache boundary. The HTML entry point
 always revalidates. Vite's content-hashed application assets and the exact-
@@ -76,8 +82,8 @@ version Stockfish directory are immutable for one year. A future engine upgrade
 must change the npm pin, the generated provenance, and the versioned application
 URL together.
 
-Cloudflare branch previews are optional. Direct pushes to `main` are permitted
+Cloudflare version previews are optional. Direct pushes to `main` are permitted
 for this solo project, so local verification is the normal pre-push safeguard;
 GitHub Actions reports the independent result rather than acting as a protected-
-branch gate. Deployment settings, production checks, and rollback are recorded
-in `docs/deployment.md`.
+branch gate. Deployment settings, production checks, and Worker-version rollback
+are recorded in `docs/deployment.md`.

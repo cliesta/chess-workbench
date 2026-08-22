@@ -9,6 +9,24 @@ in a real production environment.
 This milestone establishes a reproducible path from a Git commit to a static
 production deployment. It adds no chess capability.
 
+## Implementation outcome
+
+Milestone 3 was completed on 2026-08-22 at
+<https://chess-workbench.cliesta.workers.dev/>. Cloudflare's current repository
+import flow produced a Workers Builds static-assets deployment rather than the
+proposed Pages deployment. The owner approved that small platform variation.
+There is no application-authored server-side Worker or function, and all scope,
+cost, caching, Git deployment, failure-isolation, and client-only architecture
+goals remain unchanged.
+
+The production commit `39ab4eb` passed GitHub Actions. HTTP validation confirmed
+that the deployed HTML, JavaScript, CSS, Stockfish loader, Wasm, and licence
+match the locally verified production build; Wasm uses `application/wasm`; and
+the approved cache headers are active. The owner completed and confirmed the
+interactive board, FEN, engine, stale-result, narrow-layout, console, and engine-
+failure checks. Current operating instructions are in `docs/deployment.md`; the
+remainder of this document records the approved design and hosting research.
+
 ## 2. Scope
 
 - Choose one static host and configure one production site.

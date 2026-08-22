@@ -137,3 +137,35 @@ Wasm as `application/wasm`.
 Milestone 3 is not complete until the owner creates the public GitHub repository,
 connects it to Cloudflare Pages, and the production checklist passes at the
 stable public URL.
+
+---
+
+# 2026-08-22 — Milestone 3: Production deployment complete
+
+Chess Workbench is publicly available at
+<https://chess-workbench.cliesta.workers.dev/>. GitHub is now the canonical
+`origin`; the previous self-hosted GitLab repository remains explicitly named
+`gitlab` rather than being mirrored. The first GitHub Actions run passed the
+complete verification suite for production commit `39ab4eb`.
+
+Cloudflare's current repository import flow deployed the application through
+Workers Builds and static-assets hosting, yielding a `workers.dev` URL rather
+than the originally proposed Pages URL. This is a hosting-platform detail, not a
+new backend: the repository contains no server-side Worker or function, and
+Stockfish continues to run locally in a browser Web Worker. The owner approved
+the variation after deployment.
+
+Production HTTP checks confirmed that HTML revalidates while hashed application
+assets and versioned Stockfish files carry the intended one-year immutable cache
+policy. The Worker loader, Wasm binary, and GPL text are byte-for-byte identical
+to the pinned `stockfish@18.0.8` package; the Wasm response uses
+`application/wasm`; and provenance and corresponding-source information are
+publicly accessible. The deployed HTML, JavaScript, and CSS also match the local
+verified build.
+
+The owner confirmed the remaining interactive production checks: board and FEN
+behaviour, Stockfish depth/evaluation/SAN output, stale-result protection during
+rapid position changes, narrow-screen usability, a clean console, and graceful
+degradation when engine assets fail. Milestone 3 and Phase 1 of the product
+roadmap are complete. The next milestone should begin the deliberately small
+Workbench Intelligence phase rather than add more raw engine presentation.

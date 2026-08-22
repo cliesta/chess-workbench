@@ -59,9 +59,10 @@ The normalized FEN held by `App` is the current position. Chess rules and direct
 
 ## Production deployment
 
-The production target is Cloudflare Pages. GitHub Actions runs the complete
-verification suite on every push, while Cloudflare builds `main` directly as a
-Vite static application.
+The application is live at
+[chess-workbench.cliesta.workers.dev](https://chess-workbench.cliesta.workers.dev/).
+GitHub Actions runs the complete verification suite on every push, while
+Cloudflare Workers Builds deploys `main` as static Vite assets.
 
 See [docs/deployment.md](docs/deployment.md) for the reproducible build,
 one-time setup, production checks, caching policy, and rollback procedure.

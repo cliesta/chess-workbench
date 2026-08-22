@@ -1,10 +1,15 @@
 # Production deployment
 
-Chess Workbench's production target is a static Vite application on Cloudflare
-Pages. GitHub will be the canonical repository, `main` will be the production
-branch, and the initial stable URL will be the Cloudflare-assigned `*.pages.dev`
-address. The repository-side preparation is complete; the external setup below
-is still required.
+Chess Workbench is a static Vite application deployed through Cloudflare Workers
+Builds. GitHub is the canonical repository, `main` is the production branch, and
+the stable production URL is:
+
+<https://chess-workbench.cliesta.workers.dev/>
+
+The project uses Cloudflare's Worker static-assets hosting but contains no
+server-side Worker code. Stockfish's browser Web Worker still runs entirely on
+the visitor's device. Cloudflare documents the current Git-connected process in
+its [Workers Builds guide](https://developers.cloudflare.com/workers/ci-cd/builds/).
 
 No backend, serverless function, API key, runtime environment variable, or
 deployment secret is required.
@@ -55,13 +60,13 @@ Cloudflare and Actions may start at approximately the same time, so Actions is
 independent feedback rather than a pre-deployment gate. A failing Actions run
 makes that production deployment suspect and calls for a fix or rollback.
 
-Branches are optional. Pushing one runs the same Action and allows Cloudflare to
-create a preview URL when an isolated production-like check is useful. Pull
+Branches are optional. Pushing one runs the same Action; Cloudflare version
+previews can be used when an isolated production-like check is useful. Pull
 requests and protected-branch rules are not required.
 
-## Cloudflare Pages settings
+## Cloudflare Workers settings
 
-Create one Git-connected Pages project with these settings:
+The Git-connected Workers Builds project uses this build contract:
 
 | Setting                | Value                                        |
 | ---------------------- | -------------------------------------------- |
@@ -74,8 +79,10 @@ Create one Git-connected Pages project with these settings:
 | Environment variables  | None                                         |
 
 Cloudflare installs dependencies from `package-lock.json` before invoking the
-build. Vite's default base path `/` is correct for the `*.pages.dev` root, so no
-special `base` setting is required.
+build. Vite's default base path `/` is correct for the `workers.dev` root, so no
+special `base` setting is required. `_headers` files are supported by Workers
+static assets as well as Pages, as documented in Cloudflare's
+[static-assets migration guide](https://developers.cloudflare.com/workers/static-assets/migration-guides/migrate-from-pages/#headers-and-redirects).
 
 ## Static assets and caching
 
@@ -104,8 +111,8 @@ be served as `application/wasm`.
    commit to the stable production URL.
 5. Perform the production smoke checks below.
 
-For a branch preview, push the branch and use its Cloudflare preview URL. A
-preview is not the stable production address.
+For an optional preview, use the version preview URL shown in the Cloudflare
+deployment. A preview is not the stable production address.
 
 ## Production smoke checks
 
@@ -140,16 +147,18 @@ preview is not the stable production address.
 Headers can also be inspected without browser-cache effects:
 
 ```sh
-curl -I https://<project>.pages.dev/index.html
-curl -I https://<project>.pages.dev/assets/<built-file>.js
-curl -I https://<project>.pages.dev/stockfish/18.0.8/stockfish-18-lite-single.js
-curl -I https://<project>.pages.dev/stockfish/18.0.8/stockfish-18-lite-single.wasm
+curl -I https://chess-workbench.cliesta.workers.dev/index.html
+curl -I https://chess-workbench.cliesta.workers.dev/assets/<built-file>.js
+curl -I https://chess-workbench.cliesta.workers.dev/stockfish/18.0.8/stockfish-18-lite-single.js
+curl -I https://chess-workbench.cliesta.workers.dev/stockfish/18.0.8/stockfish-18-lite-single.wasm
 ```
 
 ## Rollback
 
-In the Cloudflare Pages dashboard, open the project's deployment history and
-roll back production to the last known-good successful deployment. Then revert
-or fix the bad Git commit and push `main` through the normal workflow. The
-dashboard rollback restores service; the Git correction prevents a later build
-from reintroducing the fault.
+In the Cloudflare dashboard, open **Workers & Pages**, select the Worker, open
+**Deployments**, use the menu beside the last known-good version, and select
+**Rollback**. Then revert or fix the bad Git commit and push `main` through the
+normal workflow. The dashboard rollback restores service; the Git correction
+prevents a later build from reintroducing the fault. Cloudflare's
+[Worker rollback documentation](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/)
+is the authoritative UI reference.
