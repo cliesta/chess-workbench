@@ -109,6 +109,7 @@ header p {
 }
 
 .position-controls,
+.game-review-panel,
 .position-insights-panel,
 .position-changes-panel,
 .analysis-panel {
@@ -122,6 +123,7 @@ header p {
 }
 
 .position-controls h2,
+.game-review-panel h2,
 .position-insights-panel h2,
 .position-changes-panel h2,
 .analysis-panel h2,
@@ -309,7 +311,8 @@ label {
   font-weight: 700;
 }
 
-input {
+input,
+textarea {
   width: 100%;
   padding: 0.8rem 0.85rem;
   border: 1px solid var(--border-strong);
@@ -324,22 +327,31 @@ input {
     box-shadow 120ms ease;
 }
 
-input:hover {
+textarea {
+  resize: vertical;
+  min-height: 8rem;
+}
+
+input:hover,
+textarea:hover {
   border-color: #56697a;
 }
 
-input:focus {
+input:focus,
+textarea:focus {
   border-color: var(--focus);
   box-shadow: 0 0 0 3px rgb(119 183 223 / 14%);
 }
 
 input:focus-visible,
+textarea:focus-visible,
 button:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
 
-input[aria-invalid="true"] {
+input[aria-invalid="true"],
+textarea[aria-invalid="true"] {
   border-color: var(--error);
 }
 
@@ -367,6 +379,115 @@ button:hover {
 
 button:active {
   transform: translateY(0);
+}
+
+button:disabled {
+  border-color: var(--border);
+  color: #687684;
+  background: rgb(5 9 13 / 20%);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.field-note,
+.game-exit-note {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.game-navigation {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 1.3rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--border);
+}
+
+.game-summary {
+  display: grid;
+  gap: 0.2rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.game-summary strong {
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.game-position-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  justify-content: space-between;
+  padding: 0.7rem 0.8rem;
+  border-radius: 0.4rem;
+  color: var(--text-muted);
+  background: rgb(5 9 13 / 25%);
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.game-position-status strong {
+  color: #dbe2e8;
+}
+
+.game-navigation-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.game-navigation-buttons button {
+  padding: 0.55rem 0.7rem;
+  font-size: 0.88rem;
+}
+
+.game-move-list {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.game-move-list li {
+  display: grid;
+  grid-template-columns: 2.5rem repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.move-number {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.move-button {
+  width: 100%;
+  padding: 0.45rem 0.58rem;
+  border-color: transparent;
+  color: #c8d0d8;
+  background: rgb(5 9 13 / 28%);
+  font-size: 0.86rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.move-black {
+  grid-column: 3;
+}
+
+.move-button:hover {
+  border-color: var(--border-strong);
+  background: rgb(255 255 255 / 5%);
+}
+
+.move-button[aria-current="step"] {
+  border-color: rgb(214 164 83 / 58%);
+  color: var(--text);
+  background: rgb(214 164 83 / 10%);
 }
 
 .error-message {
@@ -419,6 +540,7 @@ button:active {
 
 @media (prefers-reduced-motion: reduce) {
   input,
+  textarea,
   button {
     transition: none;
   }

@@ -231,3 +231,38 @@ transitions, moved and captured identity, en passant, castling, pinned-attacker
 semantics, accessible explanatory wording, and application lifecycle behavior.
 Engine-score comparison, move grading, tactical motifs, move history, and PGN
 work remain outside the milestone.
+
+---
+
+# 2026-08-22 — Milestone 6: PGN import and game navigation
+
+Chess Workbench can now load one pasted PGN and review its main line. The Game
+review panel shows available player and event details, a position counter,
+first/previous/next/last controls, and a keyboard-accessible SAN move list. The
+board, normalized FEN, deterministic position insights, “What changed?” report,
+and current-position Stockfish analysis all follow the selected ply.
+
+The application workspace is now explicitly either a standalone position or an
+imported game plus selected position index. This keeps one authoritative path to
+the displayed FEN. Loading a valid FEN or completing a legal board move exits
+review into standalone analysis; invalid input, illegal moves, and cancelled
+promotions preserve the game and selected ply. The PGN draft remains available
+to reload.
+
+All direct `chess.js` use remains in `src/chess/position.ts`. It parses the PGN
+into plain normalized FEN snapshots and reuses the existing special-move adapter
+for captures, en passant, castling, and promotion. A small ordinary-TypeScript
+game coordinator precomputes the existing factual move comparisons without
+introducing a circular module dependency or any new package.
+
+The scope remains deliberately modest: one pasted game, main line only,
+comments and NAGs accepted but not displayed, and Stockfish analysis only for
+the currently selected position. File import, variations, persistence,
+whole-game engine analysis, evaluation graphs, and move grading remain future
+work.
+
+The complete verification gate passes under Node 24 with 129 tests, formatting,
+linting, type checking, and a production build. Local production inspection
+confirmed that the built HTML and versioned Stockfish Worker/Wasm assets are
+present, byte-identical to the generated public assets, and that the Wasm is
+served as `application/wasm`.

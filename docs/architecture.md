@@ -9,12 +9,15 @@ mounts the root `App` component into the page and imports the global stylesheet.
 Vitest and React Testing Library exercise the rendered interface in a simulated
 browser DOM.
 
-## Position editing
+## Position and game workspace
 
-The normalized, full FEN string in `App` is the authoritative representation of
-the current position. The editable FEN draft and a pending promotion choice are
-separate UI state; the board component and mutable library objects are not
-additional sources of truth.
+`App` owns a small discriminated workspace: either one standalone normalized
+FEN with its latest-move report, or one immutable imported game with a selected
+position index. The FEN displayed to the board and all analysis panels is
+derived from that workspace. This prevents an imported game's selected ply and
+the displayed position from drifting apart. Editable FEN and PGN drafts, a
+pending promotion choice, and selected highlights remain separate UI state;
+they are not additional sources of valid position truth.
 
 `src/chess/position.ts` is the boundary around `chess.js` and the only
 application module that imports it. It supplies the starting FEN, validates and
@@ -24,6 +27,21 @@ short-lived chess object and returns an explicit result to React.
 `PositionBoard` adapts `react-chessboard` events to application callbacks and
 contains no rules. `PromotionDialog` collects the user's promotion choice.
 `App` coordinates those components and updates canonical state.
+
+`src/chess/position.ts` also parses one pasted PGN through `chess.js` and returns
+plain headers, normalized FEN snapshots, move numbers, and application move
+metadata. `src/chess/game.ts` combines that boundary output with the existing
+position-insight comparison to create an immutable main-line game. It imports
+both chess-domain modules so `position.ts` does not acquire a circular
+dependency on its own comparison consumer.
+
+`GameReviewPanel` renders the PGN draft, supported headers, first/previous/next/
+last navigation, and an accessible SAN move list. It has no rules or parser
+responsibility. Selecting a ply updates the workspace index and synchronizes
+the FEN draft. A valid direct FEN load or completed legal board move explicitly
+returns to standalone mode; invalid input, illegal moves, and cancelled
+promotions leave game review intact. Stockfish continues to analyse only the
+single derived current FEN, using its existing stale-result protection.
 
 `src/chess/position.ts` also converts engine principal variations from UCI
 coordinate moves to numbered SAN by replaying them from the analysed FEN. This
@@ -69,14 +87,16 @@ rooks across squares and removes captured pieces at their actual square, so a
 capture is never misreported as a piece merely becoming safe. It deliberately
 inherits the static pinned-piece semantics of the underlying insight snapshots.
 
-`App` stores only the latest `PositionChanges` report as one-step historical
-presentation state. This does not compete with `positionFen`, which remains the
-sole current-position authority. A completed board move replaces the report; a
-valid direct FEN load clears it because arbitrary FENs do not establish a
-one-move history. Invalid drafts, illegal drops, and cancelled promotions leave
-it unchanged. `PositionChangesPanel` renders the SAN and factual transitions
-without move grading or engine-score comparison. Stockfish independently starts
-analysing the new canonical FEN as before.
+In standalone mode, the workspace stores only the latest `PositionChanges`
+report as one-step historical presentation state. Imported-game positions carry
+the same precomputed report for the move that produced each FEN, so backward or
+jump navigation still explains the displayed position rather than the direction
+of travel. A completed board move replaces the workspace with a standalone
+report; a valid direct FEN load clears it because arbitrary FENs do not establish
+a one-move history. Invalid drafts, illegal drops, and cancelled promotions
+leave it unchanged. `PositionChangesPanel` renders the SAN and factual
+transitions without move grading or engine-score comparison. Stockfish
+independently starts analysing the newly derived current FEN as before.
 
 ## Engine analysis
 

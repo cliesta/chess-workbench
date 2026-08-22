@@ -1,5 +1,6 @@
 import {
   Chess,
+  Move,
   SQUARES,
   type Color,
   type PieceSymbol,
@@ -14,6 +15,29 @@ export type PromotionPiece = (typeof PROMOTION_PIECES)[number];
 
 export type ParsePositionResult =
   { kind: "valid"; fen: string } | { kind: "invalid"; message: string };
+
+export type ImportedGameHeaders = {
+  white?: string;
+  black?: string;
+  result?: string;
+  date?: string;
+  event?: string;
+  round?: string;
+};
+
+export type ParsedGamePosition = {
+  fen: string;
+  move?: AppliedMove;
+  moveNumber?: number;
+};
+
+export type ParsedGame = {
+  headers: ImportedGameHeaders;
+  positions: ParsedGamePosition[];
+};
+
+export type ParsePgnResult =
+  { kind: "valid"; game: ParsedGame } | { kind: "invalid"; message: string };
 
 export type MoveAttempt =
   | { kind: "moved"; fen: string; move: AppliedMove }
@@ -104,6 +128,40 @@ export function parsePosition(fen: string): ParsePositionResult {
   }
 }
 
+export function parsePgn(pgn: string): ParsePgnResult {
+  if (pgn.trim() === "") {
+    return { kind: "invalid", message: "Enter a PGN game to load." };
+  }
+
+  try {
+    const chess = new Chess();
+    chess.loadPgn(pgn);
+    const moves = chess.history({ verbose: true });
+    const initialFen = moves[0]?.before ?? chess.fen();
+    const positions: ParsedGamePosition[] = [{ fen: initialFen }];
+
+    for (const move of moves) {
+      positions.push({
+        fen: move.after,
+        move: toAppliedMove(new Chess(move.before), move),
+        moveNumber: getFullmoveNumber(move.before),
+      });
+    }
+
+    return {
+      kind: "valid",
+      game: {
+        headers: normalizePgnHeaders(chess.getHeaders()),
+        positions,
+      },
+    };
+  } catch (error) {
+    const detail =
+      error instanceof Error ? error.message : "Unable to parse PGN";
+    return { kind: "invalid", message: `Invalid PGN: ${detail}` };
+  }
+}
+
 export function attemptMove(
   fen: string,
   from: string,
@@ -147,24 +205,12 @@ export function attemptMove(
       return { kind: "illegal" };
     }
 
-    const captured = getCapturedPiece(chess, selectedMove);
     const appliedMove = chess.move({ from, to, promotion });
 
     return {
       kind: "moved",
       fen: chess.fen(),
-      move: {
-        color: toInsightColor(appliedMove.color),
-        piece: pieceTypeNames[appliedMove.piece],
-        from: appliedMove.from,
-        to: appliedMove.to,
-        san: appliedMove.san,
-        ...(appliedMove.promotion
-          ? { promotion: pieceTypeNames[appliedMove.promotion] }
-          : {}),
-        ...(captured ? { captured } : {}),
-        ...(getCastlingRookMove(appliedMove) ?? {}),
-      },
+      move: toAppliedMove(new Chess(fen), appliedMove),
     };
   } catch {
     return { kind: "illegal" };
@@ -318,10 +364,22 @@ function toInsightColor(color: Color): InsightColor {
   return color === "w" ? "white" : "black";
 }
 
-function getCapturedPiece(
-  chess: Chess,
-  move: ReturnType<Chess["move"]>,
-): InsightPiece | undefined {
+function toAppliedMove(chessBefore: Chess, move: Move): AppliedMove {
+  const captured = getCapturedPiece(chessBefore, move);
+
+  return {
+    color: toInsightColor(move.color),
+    piece: pieceTypeNames[move.piece],
+    from: move.from,
+    to: move.to,
+    san: move.san,
+    ...(move.promotion ? { promotion: pieceTypeNames[move.promotion] } : {}),
+    ...(captured ? { captured } : {}),
+    ...(getCastlingRookMove(move) ?? {}),
+  };
+}
+
+function getCapturedPiece(chess: Chess, move: Move): InsightPiece | undefined {
   if (!move.captured) {
     return undefined;
   }
@@ -341,7 +399,7 @@ function getCapturedPiece(
 }
 
 function getCastlingRookMove(
-  move: ReturnType<Chess["move"]>,
+  move: Move,
 ): Pick<AppliedMove, "castlingRook"> | undefined {
   const rank = move.color === "w" ? "1" : "8";
 
@@ -352,6 +410,44 @@ function getCastlingRookMove(
     return { castlingRook: { from: `a${rank}`, to: `d${rank}` } };
   }
   return undefined;
+}
+
+function getFullmoveNumber(fen: string): number {
+  const moveNumber = Number(fen.split(/\s+/)[5]);
+
+  if (!Number.isInteger(moveNumber) || moveNumber < 1) {
+    throw new Error("PGN produced an invalid move number");
+  }
+  return moveNumber;
+}
+
+function normalizePgnHeaders(
+  headers: Record<string, string>,
+): ImportedGameHeaders {
+  const fields = {
+    white: "White",
+    black: "Black",
+    result: "Result",
+    date: "Date",
+    event: "Event",
+    round: "Round",
+  } as const;
+  const normalized: ImportedGameHeaders = {};
+
+  for (const [field, header] of Object.entries(fields) as Array<
+    [keyof ImportedGameHeaders, (typeof fields)[keyof typeof fields]]
+  >) {
+    const value = headers[header]?.trim();
+    if (value && !isPlaceholderHeader(value)) {
+      normalized[field] = value;
+    }
+  }
+
+  return normalized;
+}
+
+function isPlaceholderHeader(value: string) {
+  return value === "?" || value === "????.??.??";
 }
 
 function emptyMaterialCounts(): MaterialCounts {

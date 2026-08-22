@@ -4,8 +4,141 @@ import {
   attemptMove,
   formatPrincipalVariation,
   getPositionInsights,
+  parsePgn,
   parsePosition,
 } from "./position";
+
+describe("parsePgn", () => {
+  test("builds the initial position and each main-line position", () => {
+    const result = parsePgn(`
+[Event "Club Championship"]
+[Date "2026.08.14"]
+[Round "3"]
+[White "Jane Player"]
+[Black "Alex Opponent"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 1-0
+    `);
+
+    expect(result.kind).toBe("valid");
+    if (result.kind === "valid") {
+      expect(result.game.headers).toEqual({
+        white: "Jane Player",
+        black: "Alex Opponent",
+        result: "1-0",
+        date: "2026.08.14",
+        event: "Club Championship",
+        round: "3",
+      });
+      expect(result.game.positions).toHaveLength(4);
+      expect(result.game.positions[0]).toEqual({ fen: STARTING_FEN });
+      expect(
+        result.game.positions.slice(1).map(({ move }) => move?.san),
+      ).toEqual(["e4", "e5", "Nf3"]);
+      expect(
+        result.game.positions.slice(1).map(({ moveNumber }) => moveNumber),
+      ).toEqual([1, 1, 2]);
+      expect(result.game.positions[3].fen).toBe(
+        "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
+      );
+    }
+  });
+
+  test("honors a custom position, Black to move, and its move number", () => {
+    const result = parsePgn(`
+[SetUp "1"]
+[FEN "4k3/8/8/8/8/8/4p3/4K3 b - - 0 17"]
+
+17... Kd7
+    `);
+
+    expect(result).toMatchObject({
+      kind: "valid",
+      game: {
+        positions: [
+          { fen: "4k3/8/8/8/8/8/4p3/4K3 b - - 0 17" },
+          {
+            moveNumber: 17,
+            move: { color: "black", san: "Kd7" },
+          },
+        ],
+      },
+    });
+  });
+
+  test("accepts comments and NAGs and follows only the main line", () => {
+    const result = parsePgn("1. e4 $1 {A comment} (1. d4 d5) e5 2. Nf3 *");
+
+    expect(result.kind).toBe("valid");
+    if (result.kind === "valid") {
+      expect(
+        result.game.positions.slice(1).map(({ move }) => move?.san),
+      ).toEqual(["e4", "e5", "Nf3"]);
+    }
+  });
+
+  test.each([
+    [
+      "capture",
+      "4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 7",
+      "7. exd5",
+      { captured: { color: "black", type: "pawn", square: "d5" } },
+    ],
+    [
+      "en passant",
+      "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 12",
+      "12. exd6",
+      { captured: { color: "black", type: "pawn", square: "d5" } },
+    ],
+    [
+      "castling",
+      "4k3/8/8/8/8/8/8/4K2R w K - 0 4",
+      "4. O-O",
+      { castlingRook: { from: "h1", to: "f1" } },
+    ],
+    [
+      "promotion",
+      "4k3/P7/8/8/8/8/8/4K3 w - - 0 9",
+      "9. a8=Q+",
+      { promotion: "queen" },
+    ],
+  ] as const)(
+    "preserves %s move metadata",
+    (_name, fen, movetext, metadata) => {
+      const result = parsePgn(`[SetUp "1"]\n[FEN "${fen}"]\n\n${movetext} *`);
+
+      expect(result).toMatchObject({
+        kind: "valid",
+        game: { positions: [{ fen }, { move: metadata }] },
+      });
+    },
+  );
+
+  test("accepts a headers-only game and preserves an unfinished result", () => {
+    const result = parsePgn('[Event "?"]\n[Date "????.??.??"]\n[Result "*"]');
+
+    expect(result).toEqual({
+      kind: "valid",
+      game: { headers: { result: "*" }, positions: [{ fen: STARTING_FEN }] },
+    });
+  });
+
+  test("rejects empty, malformed, and multiple-game input", () => {
+    expect(parsePgn("   ")).toEqual({
+      kind: "invalid",
+      message: "Enter a PGN game to load.",
+    });
+    expect(parsePgn("1. e4 e5 2. NotAMove")).toMatchObject({
+      kind: "invalid",
+      message: expect.stringMatching(/^Invalid PGN:/),
+    });
+    expect(parsePgn("1. e4 *\n\n1. d4 *")).toMatchObject({
+      kind: "invalid",
+      message: expect.stringMatching(/^Invalid PGN:/),
+    });
+  });
+});
 
 describe("parsePosition", () => {
   test("accepts and normalizes a valid position", () => {

@@ -57,6 +57,19 @@ vi.mock("./components/AnalysisPanel", () => ({
   ),
 }));
 
+const shortGame = `
+[White "Jane Player"]
+[Black "Alex Opponent"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 1-0
+`;
+
+function loadGame(pgn = shortGame) {
+  fireEvent.change(screen.getByLabelText("PGN"), { target: { value: pgn } });
+  fireEvent.click(screen.getByRole("button", { name: "Load game" }));
+}
+
 test("shows the starting position in the board and FEN input", () => {
   render(<App />);
 
@@ -318,4 +331,153 @@ test("cancels promotion with Escape without changing the position", () => {
 
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(screen.getByLabelText("FEN")).toHaveValue(promotionFen);
+});
+
+test("loads a PGN at its initial position and navigates every position consumer together", () => {
+  render(<App />);
+  loadGame();
+
+  expect(screen.getByText("Jane Player vs Alex Opponent")).toBeVisible();
+  expect(screen.getByText("Start position")).toBeVisible();
+  expect(screen.getByTestId("board-position")).toHaveTextContent(STARTING_FEN);
+  expect(screen.getByLabelText("FEN")).toHaveValue(STARTING_FEN);
+  expect(screen.getByTestId("analysis-position")).toHaveTextContent(
+    STARTING_FEN,
+  );
+  expect(
+    screen.getByText("Make a move on the board to see what changed."),
+  ).toBeVisible();
+
+  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+  const afterE4 = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
+  expect(screen.getByText("After 1. e4")).toBeVisible();
+  expect(screen.getByTestId("board-position")).toHaveTextContent(afterE4);
+  expect(screen.getByLabelText("FEN")).toHaveValue(afterE4);
+  expect(screen.getByTestId("analysis-position")).toHaveTextContent(afterE4);
+  expect(screen.getByText("Black to move")).toBeVisible();
+  expect(
+    screen.getByRole("region", { name: "What changed?" }),
+  ).toHaveTextContent("After e4");
+});
+
+test("supports jumping and keeps the producing-move report when navigating backward", () => {
+  render(<App />);
+  loadGame();
+
+  fireEvent.click(screen.getByRole("button", { name: "Last" }));
+  expect(screen.getByText("After 2. Nf3")).toBeVisible();
+  expect(
+    screen.getByRole("region", { name: "What changed?" }),
+  ).toHaveTextContent("After Nf3");
+
+  fireEvent.click(screen.getByRole("button", { name: "Previous" }));
+  expect(screen.getByText("After 1... e5")).toBeVisible();
+  expect(
+    screen.getByRole("region", { name: "What changed?" }),
+  ).toHaveTextContent("After e5");
+
+  fireEvent.click(screen.getByRole("button", { name: "Go to after 1. e4" }));
+  expect(screen.getByText("After 1. e4")).toBeVisible();
+});
+
+test("keeps the selected game position when a replacement PGN is invalid", () => {
+  render(<App />);
+  loadGame();
+  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+  const selectedFen = screen.getByLabelText("FEN").getAttribute("value");
+
+  loadGame("1. e4 e5 2. NotAMove");
+
+  expect(screen.getByRole("alert")).toHaveTextContent(/^Invalid PGN:/);
+  expect(screen.getByText("After 1. e4")).toBeVisible();
+  expect(screen.getByLabelText("FEN")).toHaveValue(selectedFen);
+  expect(screen.getByTestId("analysis-position")).toHaveTextContent(
+    selectedFen ?? "",
+  );
+});
+
+test("a valid FEN exits game review while retaining the PGN draft", () => {
+  render(<App />);
+  loadGame();
+  const standaloneFen = "4k3/8/8/8/8/8/8/4K3 b - - 0 23";
+
+  fireEvent.change(screen.getByLabelText("FEN"), {
+    target: { value: standaloneFen },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Load position" }));
+
+  expect(screen.queryByLabelText("Game navigation")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("PGN")).toHaveValue(shortGame);
+  expect(screen.getByTestId("board-position")).toHaveTextContent(standaloneFen);
+  expect(
+    screen.getByText("Make a move on the board to see what changed."),
+  ).toBeVisible();
+});
+
+test("invalid FEN and illegal moves stay in game review", () => {
+  render(<App />);
+  loadGame();
+
+  fireEvent.change(screen.getByLabelText("FEN"), {
+    target: { value: "not a fen" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Load position" }));
+  fireEvent.click(screen.getByRole("button", { name: "Move e2 to e5" }));
+
+  expect(screen.getByLabelText("Game navigation")).toBeVisible();
+  expect(screen.getByText("Start position")).toBeVisible();
+  expect(screen.getByTestId("board-position")).toHaveTextContent(STARTING_FEN);
+});
+
+test("a completed legal board move exits review and creates a standalone report", () => {
+  render(<App />);
+  loadGame();
+
+  fireEvent.click(screen.getByRole("button", { name: "Move e2 to e4" }));
+
+  expect(screen.queryByLabelText("Game navigation")).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("region", { name: "What changed?" }),
+  ).toHaveTextContent("After e4");
+});
+
+test("promotion cancellation stays in review and completion exits", () => {
+  render(<App />);
+  loadGame(`
+[SetUp "1"]
+[FEN "4k3/P7/8/8/8/8/8/4K3 w - - 0 1"]
+[Result "*"]
+
+*
+  `);
+
+  fireEvent.click(screen.getByRole("button", { name: "Promote a7 to a8" }));
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(screen.getByLabelText("Game navigation")).toBeVisible();
+
+  fireEvent.click(screen.getByRole("button", { name: "Promote a7 to a8" }));
+  fireEvent.click(screen.getByRole("button", { name: "Knight" }));
+  expect(screen.queryByLabelText("Game navigation")).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("region", { name: "What changed?" }),
+  ).toHaveTextContent("After a8=N");
+});
+
+test("navigation clears a selected insight highlight", () => {
+  render(<App />);
+  loadGame(`
+[SetUp "1"]
+[FEN "4k3/8/8/8/r2Q4/8/8/4K3 w - - 0 1"]
+
+1. Qe3 *
+  `);
+  fireEvent.click(
+    screen.getByRole("button", { name: /White queen on d4.*Black rook on a4/ }),
+  );
+  expect(screen.getByTestId("highlighted-target")).toHaveTextContent("d4");
+
+  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+  expect(screen.getByTestId("highlighted-target")).toHaveTextContent("none");
 });
