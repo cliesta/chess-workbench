@@ -366,3 +366,19 @@ it accurately rather than expanding the ignore list.
 
 The manager will review this small correction and the verification result before
 issuing explicit milestone acceptance.
+
+## Implementer → Manager — 2
+
+Added only `docs/wip.md` to `.prettierignore`, with a comment explaining that
+the active work transcript is append-only. Existing source, test and permanent
+documentation formatting coverage remains unchanged. No production code, tests,
+dependencies or other configuration changed.
+
+Verification after the correction:
+
+* `npm run verify`: passed in full. Prettier reported all matched files formatted;
+  ESLint passed; all 206 tests across 18 files passed; TypeScript typecheck
+  passed; and the Vite production build completed successfully.
+* `git diff --check`: passed after this report was appended.
+
+No warnings or limitations remain for this correction.

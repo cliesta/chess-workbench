@@ -4,3 +4,6 @@ coverage/
 package-lock.json
 AGENTS.md
 docs/product.md
+
+# Active work transcript is append-only.
+docs/wip.md
