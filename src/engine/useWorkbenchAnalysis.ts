@@ -454,7 +454,11 @@ function derivePositionAnalysis(
   stored: StoredPositionAnalysisState,
   gameAnalysis: GameAnalysisState,
 ): PositionAnalysisState {
-  if (game && positionIndex !== null && gameAnalysis.status === "running") {
+  if (game && gameAnalysis.status === "running") {
+    if (positionIndex === null) {
+      return { ...EMPTY_POSITION_ANALYSIS, status: "waiting-for-game" };
+    }
+
     const result = gameAnalysis.results[positionIndex];
     if (result?.fen === fen) {
       return {

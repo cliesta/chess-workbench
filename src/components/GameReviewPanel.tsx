@@ -21,9 +21,11 @@ type GameReviewPanelProps = {
   error: string | null;
   game: ImportedGame | null;
   positionIndex: number | null;
+  isExploring: boolean;
   gameAnalysis: GameAnalysisState;
   reviewMoments: ReviewMoment[];
   canAnalyseGame: boolean;
+  explorationControls: ReactNode;
   positionDetails: ReactNode;
   onDraftChange: (pgn: string) => void;
   onLoad: () => void;
@@ -38,9 +40,11 @@ export function GameReviewPanel({
   error,
   game,
   positionIndex,
+  isExploring,
   gameAnalysis,
   reviewMoments,
   canAnalyseGame,
+  explorationControls,
   positionDetails,
   onDraftChange,
   onLoad,
@@ -153,15 +157,22 @@ export function GameReviewPanel({
           <div className="game-position-toolbar">
             <p className="game-position-status" aria-live="polite">
               <strong>
-                {positionIndex === 0
-                  ? "Start position"
-                  : `After ${formatMoveLabel(game.positions[positionIndex])}`}
+                {isExploring
+                  ? positionIndex === 0
+                    ? "Exploring from start position"
+                    : `Exploring from after ${formatMoveLabel(game.positions[positionIndex])}`
+                  : positionIndex === 0
+                    ? "Start position"
+                    : `After ${formatMoveLabel(game.positions[positionIndex])}`}
               </strong>
               <span>
                 {positionIndex} of {lastIndex} plies
               </span>
               {selectedEvaluation && (
-                <span>Evaluation {selectedEvaluation}</span>
+                <span>
+                  {isExploring ? "Game source evaluation" : "Evaluation"}{" "}
+                  {selectedEvaluation}
+                </span>
               )}
             </p>
             <GameNavigationButtons
@@ -170,6 +181,8 @@ export function GameReviewPanel({
               onNavigate={onNavigate}
             />
           </div>
+
+          {explorationControls}
 
           <div
             className="game-task-tabs"
@@ -261,7 +274,8 @@ export function GameReviewPanel({
           )}
 
           <p className="game-exit-note">
-            Moving a piece or loading a standalone FEN leaves game review.
+            Board moves create a temporary exploration. Loading a standalone FEN
+            leaves game review.
           </p>
         </div>
       )}

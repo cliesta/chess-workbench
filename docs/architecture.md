@@ -11,13 +11,24 @@ browser DOM.
 
 ## Position and game workspace
 
-`App` owns a small discriminated workspace: either one standalone normalized
-FEN with its latest-move report, or one immutable imported game with a selected
-position index. The FEN displayed to the board and all analysis panels is
-derived from that workspace. This prevents an imported game's selected ply and
-the displayed position from drifting apart. Editable FEN and PGN drafts, a
-pending promotion choice, and selected highlights remain separate UI state;
-they are not additional sources of valid position truth.
+`App` owns a small discriminated workspace defined in `src/workspace.ts`.
+Standalone mode contains one linear exploration history with a cursor. Game
+mode contains an immutable imported game, a selected source position index, and
+an optional linear exploration rooted at that source. Each history entry keeps
+its normalized FEN and the report for the move that produced it. The FEN
+displayed to the board and all position consumers is derived once from the
+workspace cursor. Editable FEN and PGN drafts, a pending promotion choice, and
+selected highlights remain separate UI state; they are not additional sources
+of valid position truth.
+
+The history is deliberately one temporary line rather than a variation tree.
+Moving backward preserves its future; committing a legal move then replaces
+only the entries after the cursor. Back, forward, and reset operations keep the
+same root. A standalone FEN load establishes a new standalone root. In game
+mode reset leaves an empty exploration at the selected source, while Return to
+game removes the exploration and restores that source position. Main-line
+navigation and review-moment selection also end the temporary line and select
+the requested game position.
 
 `src/chess/position.ts` is the boundary around `chess.js` and the only
 application module that imports it. It supplies the starting FEN, validates and
@@ -26,7 +37,10 @@ short-lived chess object and returns an explicit result to React.
 
 `PositionBoard` adapts `react-chessboard` events to application callbacks and
 contains no rules. `PromotionDialog` collects the user's promotion choice.
-`App` coordinates those components and updates canonical state.
+`App` coordinates those components and updates canonical state. A completed
+promotion appends one history entry; cancellation changes none. Navigation,
+reset, return, and explicit valid replacement cancel a pending choice before it
+can be applied to another displayed position.
 
 `src/chess/position.ts` also parses one pasted PGN through `chess.js` and returns
 plain headers, normalized FEN snapshots, move numbers, and application move
@@ -59,10 +73,12 @@ reveal and focus a named board-position region, while nearby toolbar navigation
 changes position without repeatedly moving the page. This responsive behavior
 is presentational and does not create another selected-position authority.
 
-A valid direct FEN load or completed legal board move explicitly returns to
-standalone mode; invalid input, illegal moves, and cancelled promotions leave
-game review intact. Stockfish continues to analyse only the single derived
-current FEN unless the user starts the explicit whole-game pass.
+A valid direct FEN load explicitly returns to standalone mode with a fresh
+root. A completed legal board move appends to the current temporary history,
+including during game review. Invalid input, illegal moves, and cancelled
+promotions leave the history and any forward continuation intact. Stockfish
+continues to analyse only the single derived current FEN unless the user starts
+the explicit whole-game pass.
 
 Whole-game engine output is ephemeral state separate from `ImportedGame`. Its
 result array aligns with the game's position indices and repeats each FEN as a
@@ -113,21 +129,23 @@ rooks across squares and removes captured pieces at their actual square, so a
 capture is never misreported as a piece merely becoming safe. It deliberately
 inherits the static pinned-piece semantics of the underlying insight snapshots.
 
-In standalone mode, the workspace stores only the latest `PositionChanges`
-report as one-step historical presentation state. Imported-game positions carry
-the same precomputed report for the move that produced each FEN, so backward or
-jump navigation still explains the displayed position rather than the direction
-of travel. A completed board move replaces the workspace with a standalone
-report; a valid direct FEN load clears it because arbitrary FENs do not establish
-a one-move history. Invalid drafts, illegal drops, and cancelled promotions
-leave it unchanged. `PositionChangesPanel` renders the SAN and factual
-transitions without move grading or engine-score comparison. Stockfish
-independently starts analysing the newly derived current FEN as before.
+Each standalone or temporary-line history entry stores its own
+`PositionChanges` report. Imported-game positions carry the same precomputed
+report for the move that produced each FEN. Backward, forward, reset, return,
+and jump navigation therefore explain the displayed position rather than the
+direction of travel. A standalone FEN root has no report; a game exploration
+root retains the imported position's producing-move report. Invalid drafts,
+illegal drops, and cancelled promotions leave the current report and history
+unchanged. `PositionChangesPanel` renders the SAN and factual transitions
+without move grading or engine-score comparison. Stockfish independently
+follows the newly derived current FEN.
 
 ## Engine analysis
 
-`App` calls `useWorkbenchAnalysis` once with the derived current FEN, imported
-game, and selected game index. The hook owns exactly one browser engine client.
+`App` calls `useWorkbenchAnalysis` once with the derived current FEN, retained
+imported game, and the displayed position's game index. That index is null for
+an exploratory position; the retained source ply is never presented as the
+branch's identity. The hook owns exactly one browser engine client.
 When no game-analysis job is running, it starts the established fixed
 1,500-millisecond search whenever the selected FEN changes. `AnalysisPanel` is a
 presentation-only consumer of its typed state. Draft or invalid FEN text never
@@ -137,14 +155,19 @@ An explicit whole-game pass temporarily owns that same Worker. The hook
 supersedes the interactive search, submits the imported initial position and
 every after-position sequentially at 500 milliseconds each, and retains the
 latest depth, White-perspective evaluation, and SAN PV for completed positions.
-Navigation does not interrupt the queue. The selected Analysis panel shows only
-a matching live, retained, or waiting state; it never starts a competing search.
-When the pass completes or is cancelled, normal analysis resumes for the
-currently selected FEN.
+Navigation and exploration do not interrupt the queue. A branch displays an
+empty waiting state while the whole-game pass owns the Worker, so a main-line
+score or PV cannot appear as its evaluation. The selected Analysis panel shows
+only a matching live, retained, or waiting state; it never starts a competing
+search. When the pass completes or is cancelled, normal analysis resumes for
+the currently displayed FEN.
 
 Each game run has a generation identifier in addition to the engine request ID,
-FEN, game object, and position index checks. Replacing the game or leaving game
-review invalidates that generation, stops active work, and discards its results.
+FEN, game object, and position index checks. Replacing the game or loading a
+standalone FEN invalidates that generation, stops active work, and discards its
+results. Starting, navigating, resetting, or returning from a temporary game
+exploration retains the same game identity and therefore preserves the running
+pass and its completed or partial results.
 Cancellation preserves completed entries but submits no later positions. Late
 promises may settle, but their callbacks cannot write into a replacement run.
 Worker/protocol failure remains terminal for the engine client; partial game

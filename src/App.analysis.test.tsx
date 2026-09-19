@@ -21,6 +21,9 @@ vi.mock("./components/PositionBoard", () => ({
       <button type="button" onClick={() => onMove("e2", "e4")}>
         Move e2 to e4
       </button>
+      <button type="button" onClick={() => onMove("d7", "d5")}>
+        Move d7 to d5
+      </button>
     </section>
   ),
 }));
@@ -144,6 +147,49 @@ test("runs, navigates, and cancels a whole-game pass through the application", a
     fen: expect.stringContaining(" b "),
     moveTimeMs: 1500,
   });
+});
+
+test("keeps a game pass and its results while exploring and returning", async () => {
+  const engine = new FakeAnalysisEngine();
+  render(<App createEngine={() => engine} />);
+  loadGame();
+  await act(async () => engine.finishInitialization());
+  fireEvent.click(screen.getByRole("button", { name: "Analyse game" }));
+
+  fireEvent.click(screen.getByRole("button", { name: "Move e2 to e4" }));
+  expect(screen.getByText("Temporary exploration")).toBeVisible();
+  fireEvent.click(screen.getByRole("tab", { name: "Position details" }));
+  expect(screen.getByRole("region", { name: "Analysis" })).toHaveTextContent(
+    "Waiting for game analysis",
+  );
+  expect(screen.getByRole("region", { name: "Analysis" })).toHaveTextContent(
+    "Evaluation—",
+  );
+
+  emitResult(engine, 1, 100, "1. d4 d5");
+  await act(async () => engine.requests[1]?.resolve("complete"));
+  emitResult(engine, 2, -100, "1... e5");
+  await act(async () => engine.requests[2]?.resolve("complete"));
+  emitResult(engine, 3, -90, "2. Nf3");
+  await act(async () => engine.requests[3]?.resolve("complete"));
+
+  expect(engine.requests[4]?.request).toMatchObject({
+    fen: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+    moveTimeMs: 1500,
+  });
+  fireEvent.click(screen.getByRole("tab", { name: "Review" }));
+  expect(
+    screen.getByRole("region", { name: "Review moments" }),
+  ).toHaveTextContent("White's position worsened by about 2.00 pawns.");
+
+  fireEvent.click(screen.getByRole("button", { name: "Return to game" }));
+  expect(screen.getByText("Start position")).toBeVisible();
+  expect(
+    screen.getByRole("region", { name: "Review moments" }),
+  ).toHaveTextContent("2.00 pawns");
+  expect(
+    engine.requests.filter(({ request }) => request.moveTimeMs === 500),
+  ).toHaveLength(3);
 });
 
 test("invalid input preserves a run while a valid FEN exits and cancels it", async () => {

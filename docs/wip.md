@@ -240,3 +240,65 @@ review unchanged. No commit, push or deployment is requested.
 Append `Implementer → Manager — 1` with the implementation summary, verification,
 limitations and any decisions needing review, then stop. The manager will inspect
 and independently verify the result before accepting this milestone.
+
+## Implementer → Manager — 1
+
+Implemented Safe Exploration as one linear history with a cursor. A new
+`src/workspace.ts` boundary owns the displayed-entry derivation and the append,
+back/forward, future replacement, reset, game return and game-navigation
+transitions. Standalone FENs establish fresh roots. Game workspaces retain the
+same immutable game and source ply while an optional temporary history is
+displayed, so returning does not reimport the game or change its analysis
+identity.
+
+Added responsive exploration controls with explicit Back, Forward, Reset line
+and, for retained games, Return to game actions. Game status identifies the
+source position, and a retained score is labelled Game source evaluation so it
+cannot be mistaken for the branch evaluation. What changed?, FEN, insights,
+board and selected-position analysis all follow the history cursor. Successful
+promotion appends one entry; cancellation, illegal moves and invalid input leave
+the cursor and forward continuation unchanged. Game navigation and review-move
+selection end exploration relative to the retained source.
+
+Kept the imported game object and active whole-game pass during exploration.
+The analysis hook now returns an empty Waiting for game analysis state when a
+retained game has an exploratory FEN and the shared Worker is scanning the main
+line. Completion or cancellation resumes selected-position analysis for the
+currently displayed branch. Existing generation, request and FEN guards remain
+in place. Valid FEN or PGN replacement still invalidates the old identity and
+history.
+
+Added pure workspace tests and application/engine integration coverage for
+standalone and game histories, forward preservation and branch replacement,
+custom roots, reset versus return, source-relative game navigation, invalid
+input, promotion, valid replacement, active-pass waiting, completion,
+cancellation and retained review results. Updated `docs/architecture.md` and the
+directly affected game-review instruction.
+
+Verification:
+
+* `npm test`: passed, 18 files and 206 tests.
+* `npm run lint`: passed.
+* `npm run typecheck`: passed.
+* `npm run build`: passed; Vite produced the production bundle successfully.
+* Prettier check over every changed implementation, test and architecture file:
+  passed.
+* `git diff --check`: passed.
+* `npm run verify`: stopped at `format:check` because the pre-existing active
+  transcript portion of `docs/wip.md` uses asterisk list markers that Prettier
+  would rewrite. I restored those lines rather than rewriting prior append-only
+  manager/owner entries. All remaining gates were run independently as above.
+
+Real-browser smoke check used the required Fool's Mate PGN and real Stockfish.
+The quick pass completed all five positions. From the selected review moment
+after `g4`, I navigated to after `1...e5`, played `Nc3` and `...d6`, verified
+Back and Forward, undid the reply and replaced it with `...Nc6`, then verified
+Forward was disabled. Reset returned to the `1...e5` root and Return to game
+restored that source; the completed five-position result and review moment
+remained without another scan. A custom standalone FEN supported move, Back,
+Forward and reset to its custom root. Exploration and game controls were clear
+and usable at 1200px desktop and 390px narrow viewports.
+
+No dependencies were added. The intentional limitation is one disposable
+temporary line per workspace; there is no variation tree or saved branch
+collection. No product or architectural decision remains blocked.

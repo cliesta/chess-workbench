@@ -9,11 +9,9 @@ import {
   type AppliedMove,
   type PromotionPiece,
 } from "./chess/position";
-import {
-  comparePositionInsights,
-  type PositionChanges,
-} from "./chess/positionChanges";
+import { comparePositionInsights } from "./chess/positionChanges";
 import { AnalysisPanel } from "./components/AnalysisPanel";
+import { ExplorationControls } from "./components/ExplorationControls";
 import { GameReviewPanel } from "./components/GameReviewPanel";
 import { PositionBoard } from "./components/PositionBoard";
 import { PositionChangesPanel } from "./components/PositionChangesPanel";
@@ -24,6 +22,18 @@ import {
   useWorkbenchAnalysis,
   type PositionAnalysisEngineFactory,
 } from "./engine/useWorkbenchAnalysis";
+import {
+  appendExplorationMove,
+  createGameWorkspace,
+  createPositionWorkspace,
+  displayedEntry,
+  getExploration,
+  navigateExploration,
+  navigateGame,
+  resetExploration,
+  returnToGame,
+  type Workspace,
+} from "./workspace";
 
 type PendingPromotion = {
   from: string;
@@ -31,28 +41,14 @@ type PendingPromotion = {
   choices: PromotionPiece[];
 };
 
-type Workspace =
-  | {
-      kind: "position";
-      fen: string;
-      changes: PositionChanges | null;
-    }
-  | {
-      kind: "game";
-      game: ImportedGame;
-      positionIndex: number;
-    };
-
 type AppProps = {
   createEngine?: PositionAnalysisEngineFactory;
 };
 
 function App({ createEngine }: AppProps = {}) {
-  const [workspace, setWorkspace] = useState<Workspace>({
-    kind: "position",
-    fen: STARTING_FEN,
-    changes: null,
-  });
+  const [workspace, setWorkspace] = useState<Workspace>(() =>
+    createPositionWorkspace(STARTING_FEN),
+  );
   const [fenDraft, setFenDraft] = useState(STARTING_FEN);
   const [fenError, setFenError] = useState<string | null>(null);
   const [pgnDraft, setPgnDraft] = useState("");
@@ -63,17 +59,15 @@ function App({ createEngine }: AppProps = {}) {
     string | null
   >(null);
   const boardPositionRef = useRef<HTMLElement>(null);
-  const positionFen =
-    workspace.kind === "position"
-      ? workspace.fen
-      : workspace.game.positions[workspace.positionIndex].fen;
-  const lastPositionChanges =
-    workspace.kind === "position"
-      ? workspace.changes
-      : (workspace.game.positions[workspace.positionIndex].changes ?? null);
+  const currentEntry = displayedEntry(workspace);
+  const positionFen = currentEntry.fen;
+  const lastPositionChanges = currentEntry.changes;
+  const exploration = getExploration(workspace);
   const currentGame = workspace.kind === "game" ? workspace.game : null;
   const currentGamePositionIndex =
-    workspace.kind === "game" ? workspace.positionIndex : null;
+    workspace.kind === "game" && workspace.exploration === null
+      ? workspace.positionIndex
+      : null;
   const analysis = useWorkbenchAnalysis({
     fen: positionFen,
     game: currentGame,
@@ -94,15 +88,21 @@ function App({ createEngine }: AppProps = {}) {
         : [],
     [currentGame, analysis.gameAnalysis.results],
   );
-  const boardPositionLabel =
-    currentGame && currentGamePositionIndex !== null
-      ? formatBoardPositionLabel(
-          currentGame.positions[currentGamePositionIndex],
+  const gameSourceLabel =
+    workspace.kind === "game"
+      ? formatGamePositionLabel(
+          workspace.game.positions[workspace.positionIndex],
         )
+      : null;
+  const boardPositionLabel =
+    workspace.kind === "game"
+      ? workspace.exploration
+        ? `Exploration from ${gameSourceLabel}`
+        : (gameSourceLabel ?? "Game position")
       : "Current position";
 
-  function commitPosition(fen: string, changes: PositionChanges | null) {
-    setWorkspace({ kind: "position", fen, changes });
+  function replaceWithPosition(fen: string) {
+    setWorkspace(createPositionWorkspace(fen));
     setFenDraft(fen);
     setFenError(null);
     setSelectedInsightSquare(null);
@@ -110,7 +110,11 @@ function App({ createEngine }: AppProps = {}) {
 
   function commitMove(fen: string, move: AppliedMove) {
     const nextInsights = getPositionInsights(fen);
-    commitPosition(fen, comparePositionInsights(insights, nextInsights, move));
+    const changes = comparePositionInsights(insights, nextInsights, move);
+    setWorkspace((current) => appendExplorationMove(current, { fen, changes }));
+    setFenDraft(fen);
+    setFenError(null);
+    setSelectedInsightSquare(null);
   }
 
   function handleFenSubmit(event: FormEvent<HTMLFormElement>) {
@@ -122,7 +126,7 @@ function App({ createEngine }: AppProps = {}) {
       return;
     }
 
-    commitPosition(result.fen, null);
+    replaceWithPosition(result.fen);
     setPendingPromotion(null);
   }
 
@@ -135,7 +139,7 @@ function App({ createEngine }: AppProps = {}) {
     }
 
     const initialFen = result.game.positions[0].fen;
-    setWorkspace({ kind: "game", game: result.game, positionIndex: 0 });
+    setWorkspace(createGameWorkspace(result.game));
     setFenDraft(initialFen);
     setFenError(null);
     setPgnError(null);
@@ -148,14 +152,9 @@ function App({ createEngine }: AppProps = {}) {
       return;
     }
 
-    const boundedIndex = Math.max(
-      0,
-      Math.min(positionIndex, workspace.game.positions.length - 1),
-    );
-    const fen = workspace.game.positions[boundedIndex].fen;
-
-    setWorkspace({ ...workspace, positionIndex: boundedIndex });
-    setFenDraft(fen);
+    const nextWorkspace = navigateGame(workspace, positionIndex);
+    setWorkspace(nextWorkspace);
+    setFenDraft(displayedEntry(nextWorkspace).fen);
     setFenError(null);
     setPendingPromotion(null);
     setSelectedInsightSquare(null);
@@ -163,6 +162,33 @@ function App({ createEngine }: AppProps = {}) {
     if (revealBoard) {
       revealBoardOnNarrowScreen();
     }
+  }
+
+  function handleExplorationNavigation(cursor: number) {
+    const nextWorkspace = navigateExploration(workspace, cursor);
+    setWorkspace(nextWorkspace);
+    setFenDraft(displayedEntry(nextWorkspace).fen);
+    clearPositionPresentation();
+  }
+
+  function handleExplorationReset() {
+    const nextWorkspace = resetExploration(workspace);
+    setWorkspace(nextWorkspace);
+    setFenDraft(displayedEntry(nextWorkspace).fen);
+    clearPositionPresentation();
+  }
+
+  function handleReturnToGame() {
+    const nextWorkspace = returnToGame(workspace);
+    setWorkspace(nextWorkspace);
+    setFenDraft(displayedEntry(nextWorkspace).fen);
+    clearPositionPresentation();
+  }
+
+  function clearPositionPresentation() {
+    setFenError(null);
+    setPendingPromotion(null);
+    setSelectedInsightSquare(null);
   }
 
   function revealBoardOnNarrowScreen() {
@@ -243,15 +269,36 @@ function App({ createEngine }: AppProps = {}) {
         </section>
 
         <div className="side-panel">
-          {currentGame && currentGamePositionIndex !== null ? (
+          {workspace.kind === "game" ? (
             <GameReviewPanel
               pgnDraft={pgnDraft}
               error={pgnError}
               game={currentGame}
-              positionIndex={currentGamePositionIndex}
+              positionIndex={workspace.positionIndex}
+              isExploring={workspace.exploration !== null}
               gameAnalysis={analysis.gameAnalysis}
               reviewMoments={reviewMoments}
               canAnalyseGame={analysis.canAnalyseGame}
+              explorationControls={
+                workspace.exploration ? (
+                  <ExplorationControls
+                    history={workspace.exploration}
+                    gameSourceLabel={gameSourceLabel ?? undefined}
+                    onBack={() =>
+                      handleExplorationNavigation(
+                        workspace.exploration!.cursor - 1,
+                      )
+                    }
+                    onForward={() =>
+                      handleExplorationNavigation(
+                        workspace.exploration!.cursor + 1,
+                      )
+                    }
+                    onReset={handleExplorationReset}
+                    onReturnToGame={handleReturnToGame}
+                  />
+                ) : null
+              }
               positionDetails={
                 <>
                   <AnalysisPanel analysis={analysis.positionAnalysis} />
@@ -287,14 +334,28 @@ function App({ createEngine }: AppProps = {}) {
                 onDraftChange={setFenDraft}
                 onSubmit={handleFenSubmit}
               />
+              {exploration && (
+                <ExplorationControls
+                  history={exploration}
+                  onBack={() =>
+                    handleExplorationNavigation(exploration.cursor - 1)
+                  }
+                  onForward={() =>
+                    handleExplorationNavigation(exploration.cursor + 1)
+                  }
+                  onReset={handleExplorationReset}
+                />
+              )}
               <GameReviewPanel
                 pgnDraft={pgnDraft}
                 error={pgnError}
                 game={null}
                 positionIndex={null}
+                isExploring={false}
                 gameAnalysis={analysis.gameAnalysis}
                 reviewMoments={[]}
                 canAnalyseGame={false}
+                explorationControls={null}
                 positionDetails={null}
                 onDraftChange={setPgnDraft}
                 onLoad={handleGameLoad}
@@ -326,7 +387,7 @@ function App({ createEngine }: AppProps = {}) {
   );
 }
 
-function formatBoardPositionLabel(position: ImportedGame["positions"][number]) {
+function formatGamePositionLabel(position: ImportedGame["positions"][number]) {
   if (!position.move || position.moveNumber === undefined) {
     return "Game start position";
   }

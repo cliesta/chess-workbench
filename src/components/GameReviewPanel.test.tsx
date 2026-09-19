@@ -60,9 +60,11 @@ function renderPanel(
     error: null,
     game: null,
     positionIndex: null,
+    isExploring: false,
     gameAnalysis: { ...idleGameAnalysis, results: [], totalCount: 0 },
     reviewMoments: [],
     canAnalyseGame: false,
+    explorationControls: null,
     positionDetails: (
       <section aria-label="Position detail content">Details</section>
     ),
@@ -135,9 +137,7 @@ test("renders metadata, move status, current step, and navigation callbacks", ()
   expect(props.onNavigate).toHaveBeenNthCalledWith(4, 2);
   expect(props.onRevealPosition).toHaveBeenCalledWith(2);
   expect(
-    screen.getByText(
-      "Moving a piece or loading a standalone FEN leaves game review.",
-    ),
+    screen.getByText(/Board moves create a temporary exploration/),
   ).toBeVisible();
 });
 
@@ -392,6 +392,39 @@ test("puts matching selected-position evaluation in the toolbar", () => {
   });
 
   expect(screen.getByText("Evaluation −1.20")).toBeVisible();
+});
+
+test("labels retained game context separately while exploring", () => {
+  renderPanel({
+    game,
+    positionIndex: 1,
+    isExploring: true,
+    explorationControls: (
+      <section aria-label="Temporary line controls">Line controls</section>
+    ),
+    gameAnalysis: {
+      ...idleGameAnalysis,
+      status: "complete",
+      completedCount: 3,
+      results: [
+        null,
+        {
+          fen: "after-e4",
+          depth: 10,
+          evaluation: { kind: "centipawns", whiteCentipawns: -120 },
+          principalVariation: "1... e5",
+          principalVariationUsesRawNotation: false,
+        },
+        null,
+      ],
+    },
+  });
+
+  expect(screen.getByText("Exploring from after 1. e4")).toBeVisible();
+  expect(screen.getByText("Game source evaluation −1.20")).toBeVisible();
+  expect(
+    screen.getByRole("region", { name: "Temporary line controls" }),
+  ).toBeVisible();
 });
 
 test("orders the toolbar before task views in the accessible document", () => {

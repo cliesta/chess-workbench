@@ -40,6 +40,12 @@ vi.mock("./components/PositionBoard", () => ({
       <button type="button" onClick={() => onMove("e7", "e5")}>
         Move e7 to e5
       </button>
+      <button type="button" onClick={() => onMove("d7", "d5")}>
+        Move d7 to d5
+      </button>
+      <button type="button" onClick={() => onMove("c2", "c4")}>
+        Move c2 to c4
+      </button>
       <button type="button" onClick={() => onMove("e4", "d5")}>
         Capture e4 on d5
       </button>
@@ -222,6 +228,63 @@ test("replaces the previous report after the next legal move", () => {
   expect(report).not.toHaveTextContent("After e4");
 });
 
+test("navigates standalone history and replaces only an abandoned continuation", () => {
+  render(<App />);
+
+  expect(screen.getByText("Root position")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Back" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Forward" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Reset line" })).toBeDisabled();
+
+  fireEvent.click(screen.getByRole("button", { name: "Move e2 to e4" }));
+  fireEvent.click(screen.getByRole("button", { name: "Move e7 to e5" }));
+  expect(screen.getByText("Move 2 of 2")).toBeVisible();
+
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
+  expect(screen.getByTestId("board-position")).toHaveTextContent(
+    "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+  );
+  expect(
+    screen.getByRole("region", { name: "What changed?" }),
+  ).toHaveTextContent("After e4");
+  expect(screen.getByRole("button", { name: "Forward" })).toBeEnabled();
+
+  fireEvent.click(screen.getByRole("button", { name: "Forward" }));
+  expect(screen.getByTestId("board-position")).toHaveTextContent(
+    "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
+  fireEvent.click(screen.getByRole("button", { name: "Move d7 to d5" }));
+  expect(screen.getByText("Move 2 of 2")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Forward" })).toBeDisabled();
+  expect(
+    screen.getByRole("region", { name: "What changed?" }),
+  ).toHaveTextContent("After d5");
+
+  fireEvent.click(screen.getByRole("button", { name: "Reset line" }));
+  expect(screen.getByTestId("board-position")).toHaveTextContent(STARTING_FEN);
+  expect(screen.getByText("Root position")).toBeVisible();
+  expect(
+    screen.getByText("Make a move on the board to see what changed."),
+  ).toBeVisible();
+});
+
+test("resets a standalone line to its loaded custom root", () => {
+  render(<App />);
+  const customRoot = "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1";
+
+  fireEvent.change(screen.getByLabelText("FEN"), {
+    target: { value: customRoot },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Load position" }));
+  fireEvent.click(screen.getByRole("button", { name: "Move e2 to e4" }));
+  fireEvent.click(screen.getByRole("button", { name: "Reset line" }));
+
+  expect(screen.getByTestId("board-position")).toHaveTextContent(customRoot);
+  expect(screen.getByLabelText("FEN")).toHaveValue(customRoot);
+});
+
 test("reports material changes after a capture", () => {
   render(<App />);
   const captureFen = "4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1";
@@ -267,6 +330,26 @@ test("keeps a move report after an invalid FEN or illegal move", () => {
   expect(
     screen.getByRole("region", { name: "What changed?" }),
   ).toHaveTextContent("After e4");
+});
+
+test("invalid input and an illegal move preserve a forward continuation", () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "Move e2 to e4" }));
+  fireEvent.click(screen.getByRole("button", { name: "Move e7 to e5" }));
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
+
+  fireEvent.change(screen.getByLabelText("FEN"), {
+    target: { value: "not a fen" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Load position" }));
+  fireEvent.click(screen.getByRole("button", { name: "Move e2 to e5" }));
+
+  expect(screen.getByRole("alert")).toHaveTextContent(/invalid fen/i);
+  expect(screen.getByRole("button", { name: "Forward" })).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: "Forward" }));
+  expect(screen.getByTestId("board-position")).toHaveTextContent(
+    "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+  );
 });
 
 test("selects a finding for board highlights and clears it on position change", () => {
@@ -544,19 +627,88 @@ test("invalid FEN and illegal moves stay in game review", () => {
   expect(screen.getByTestId("board-position")).toHaveTextContent(STARTING_FEN);
 });
 
-test("a completed legal board move exits review and creates a standalone report", () => {
+test("a completed legal board move starts a temporary line and retains review", () => {
   render(<App />);
   loadGame();
 
   fireEvent.click(screen.getByRole("button", { name: "Move e2 to e4" }));
 
-  expect(screen.queryByLabelText("Game navigation")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Game navigation")).toBeVisible();
+  expect(screen.getByText("Temporary exploration")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Return to game" })).toBeVisible();
+  showPositionDetails();
   expect(
     screen.getByRole("region", { name: "What changed?" }),
   ).toHaveTextContent("After e4");
 });
 
-test("promotion cancellation stays in review and completion exits", () => {
+test("navigates, branches, resets, and returns from a retained game source", () => {
+  render(<App />);
+  loadGame();
+  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+  showPositionDetails();
+
+  fireEvent.click(screen.getByRole("button", { name: "Move d7 to d5" }));
+  fireEvent.click(screen.getByRole("button", { name: "Move c2 to c4" }));
+  expect(screen.getByText("Exploring from after 1. e4")).toBeVisible();
+  expect(screen.getByText("Move 2 of 2")).toBeVisible();
+  expect(
+    screen.getByRole("region", { name: "What changed?" }),
+  ).toHaveTextContent("After c4");
+
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
+  expect(
+    screen.getByRole("region", { name: "What changed?" }),
+  ).toHaveTextContent("After d5");
+  expect(screen.getByRole("button", { name: "Forward" })).toBeEnabled();
+
+  fireEvent.click(screen.getByRole("button", { name: "Reset line" }));
+  expect(screen.getByText("Root position")).toBeVisible();
+  expect(screen.getByTestId("board-position")).toHaveTextContent(
+    "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+  );
+  expect(
+    screen.getByRole("region", { name: "What changed?" }),
+  ).toHaveTextContent("After e4");
+
+  fireEvent.click(screen.getByRole("button", { name: "Return to game" }));
+  expect(screen.queryByText("Temporary exploration")).not.toBeInTheDocument();
+  expect(screen.getByText("After 1. e4")).toBeVisible();
+  expect(screen.getByRole("tab", { name: "Position details" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+});
+
+test("game navigation ends exploration relative to its retained source", () => {
+  render(<App />);
+  loadGame();
+  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+  fireEvent.click(screen.getByRole("button", { name: "Move d7 to d5" }));
+
+  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+  expect(screen.queryByText("Temporary exploration")).not.toBeInTheDocument();
+  expect(screen.getByText("After 1... e5")).toBeVisible();
+  expect(screen.getByTestId("board-position")).toHaveTextContent(
+    "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+  );
+});
+
+test("a valid replacement PGN discards the temporary line and starts at its root", () => {
+  render(<App />);
+  loadGame();
+  fireEvent.click(screen.getByRole("button", { name: "Move e2 to e4" }));
+  expect(screen.getByText("Temporary exploration")).toBeVisible();
+
+  loadGame("1. d4 d5 *");
+
+  expect(screen.queryByText("Temporary exploration")).not.toBeInTheDocument();
+  expect(screen.getByText("Start position")).toBeVisible();
+  expect(screen.getByTestId("board-position")).toHaveTextContent(STARTING_FEN);
+});
+
+test("promotion cancellation changes no history and completion adds one move", () => {
   render(<App />);
   loadGame(`
 [SetUp "1"]
@@ -569,10 +721,13 @@ test("promotion cancellation stays in review and completion exits", () => {
   fireEvent.click(screen.getByRole("button", { name: "Promote a7 to a8" }));
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
   expect(screen.getByLabelText("Game navigation")).toBeVisible();
+  expect(screen.queryByText("Temporary exploration")).not.toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("button", { name: "Promote a7 to a8" }));
   fireEvent.click(screen.getByRole("button", { name: "Knight" }));
-  expect(screen.queryByLabelText("Game navigation")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Game navigation")).toBeVisible();
+  expect(screen.getByText("Move 1 of 1")).toBeVisible();
+  showPositionDetails();
   expect(
     screen.getByRole("region", { name: "What changed?" }),
   ).toHaveTextContent("After a8=N");

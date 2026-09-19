@@ -279,6 +279,94 @@ describe("useWorkbenchAnalysis", () => {
     });
   });
 
+  test("an exploratory FEN waits for an active game pass then resumes selected analysis", async () => {
+    const engine = new FakeAnalysisEngine();
+    const factory = () => engine;
+    const branchFen =
+      "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2";
+    const { result, rerender } = renderHook(
+      ({ fen, positionIndex }: { fen: string; positionIndex: number | null }) =>
+        useWorkbenchAnalysis({
+          fen,
+          game,
+          positionIndex,
+          createEngine: factory,
+        }),
+      {
+        initialProps: {
+          fen: STARTING_FEN,
+          positionIndex: 0 as number | null,
+        },
+      },
+    );
+    await act(async () => engine.finishInitialization());
+    act(() => result.current.startGameAnalysis());
+
+    rerender({ fen: branchFen, positionIndex: null });
+    expect(result.current.positionAnalysis).toMatchObject({
+      status: "waiting-for-game",
+      depth: null,
+      evaluation: null,
+      principalVariation: null,
+    });
+    act(() => {
+      engine.emit(1, {
+        depth: 18,
+        evaluation: { kind: "centipawns", whiteCentipawns: 300 },
+        principalVariation: "unrelated game line",
+      });
+    });
+    expect(result.current.positionAnalysis.evaluation).toBeNull();
+
+    await act(async () => engine.requests[1]?.resolve("complete"));
+    await act(async () => engine.requests[2]?.resolve("complete"));
+    await act(async () => engine.requests[3]?.resolve("complete"));
+
+    expect(result.current.gameAnalysis.status).toBe("complete");
+    expect(engine.requests[4]?.request).toMatchObject({
+      fen: branchFen,
+      moveTimeMs: CURRENT_POSITION_MOVE_TIME_MS,
+    });
+  });
+
+  test("cancellation on an exploratory FEN retains results and resumes that FEN", async () => {
+    const engine = new FakeAnalysisEngine();
+    const factory = () => engine;
+    const branchFen =
+      "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2";
+    const { result } = renderHook(() =>
+      useWorkbenchAnalysis({
+        fen: branchFen,
+        game,
+        positionIndex: null,
+        createEngine: factory,
+      }),
+    );
+    await act(async () => engine.finishInitialization());
+    act(() => result.current.startGameAnalysis());
+    act(() => {
+      engine.emit(1, {
+        depth: 8,
+        evaluation: { kind: "centipawns", whiteCentipawns: 20 },
+        principalVariation: "1. e4",
+      });
+    });
+    await act(async () => engine.requests[1]?.resolve("complete"));
+
+    act(() => result.current.cancelGameAnalysis());
+    await act(async () => engine.requests[2]?.resolve("interrupted"));
+
+    expect(result.current.gameAnalysis).toMatchObject({
+      status: "cancelled",
+      completedCount: 1,
+    });
+    expect(result.current.gameAnalysis.results[0]?.fen).toBe(STARTING_FEN);
+    expect(engine.requests[3]?.request).toMatchObject({
+      fen: branchFen,
+      moveTimeMs: CURRENT_POSITION_MOVE_TIME_MS,
+    });
+  });
+
   test("cancels cooperatively, retains completed results, and resumes current analysis", async () => {
     const engine = new FakeAnalysisEngine();
     const factory = () => engine;
