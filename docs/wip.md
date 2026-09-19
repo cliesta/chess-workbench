@@ -302,3 +302,67 @@ and usable at 1200px desktop and 390px narrow viewports.
 No dependencies were added. The intentional limitation is one disposable
 temporary line per workspace; there is no variation tree or saved branch
 collection. No product or architectural decision remains blocked.
+
+## Manager → Implementer — 2
+
+### Review of work order 1
+
+Reviewed implementation commit `78974b5` against the preceding checkout
+`c8dca4e`, including workspace transitions, application wiring, engine handling,
+controls, tests and architecture documentation. The working tree was clean at
+review start. I found no blocking production-code defect in the reviewed Safe
+Exploration behaviour.
+
+The retained immutable game plus one temporary history is an appropriate small
+change. Source-ply context remains distinct from displayed branch identity,
+forward history is replaced only on a successful move, and the explicit waiting
+state correctly preserves single-Worker batch ownership. The updated
+architecture description matches these boundaries.
+
+Independent verification:
+
+- `npm test`: passed, 206 tests across 18 files.
+- `npm run lint`: passed.
+- `npm run typecheck`: passed.
+- `npm run build`: passed.
+- `git diff --check`: passed.
+- `npm run verify`: failed at formatting, reporting only `docs/wip.md`.
+
+I independently reproduced the real-board workflow with real Stockfish: loaded
+and analysed the required game, selected the `g4` review moment, navigated back
+to after `1...e5`, played `Nc3` and `...d6`, navigated Back/Forward, undid and
+replaced the reply with `...Nc6`, then reset and returned. Forward became disabled
+after replacement, reset restored the root and its `e5` producing-move report,
+and Return preserved the Position details view. Returning to Review showed the
+same completed five-position scan and review moments without starting a new
+scan. Source evaluation was explicitly labelled during exploration. This
+independent browser check was desktop; the implementer's narrow-screen and
+standalone browser observations are supplementary to the inspected automated
+coverage, not checks I independently repeated in this review.
+
+### Remaining blocker and bounded correction
+
+The milestone is **not yet accepted** because the required repository verification
+command remains red. The implementer correctly avoided rewriting the transcript:
+I ran the pre-implementation `docs/wip.md` from `c8dca4e` through Prettier and
+confirmed that the owner-authored asterisk lists already caused the conflict.
+This is a pre-existing formatting-policy conflict, not a Safe Exploration code
+regression.
+
+Resolve it narrowly by adding the exact path `docs/wip.md` to `.prettierignore`,
+with a short comment explaining that the active work transcript is append-only.
+The repository already excludes owner-maintained `AGENTS.md` and
+`docs/product.md`; this exclusion should apply only to the temporary shared
+transcript. Continue formatting source, tests and permanent architecture docs.
+Do not exclude all Markdown or the docs directory, weaken any other checks, or
+reformat earlier transcript entries. This is a directly necessary verification
+configuration correction authorised by this work order.
+
+Run `npm run verify` and `git diff --check` after the change and after appending
+your report. Report the complete result as `Implementer → Manager — 2`, then
+stop. No production-code changes, new features, dependency updates or additional
+milestone work are requested. If verification reveals another failure, report
+it accurately rather than expanding the ignore list.
+
+The manager will review this small correction and the verification result before
+issuing explicit milestone acceptance.
